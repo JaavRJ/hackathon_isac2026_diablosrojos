@@ -15,6 +15,7 @@ Escala: `100` = promedio LMB, `110` = una desviación estándar mejor.
 |---|---|
 | Reglas para agentes | [AGENTS.md](AGENTS.md) |
 | Idea, física, métodos, entregables | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) |
+| Plan de sprints y tareas | [docs/PLAN.md](docs/PLAN.md) |
 | Benchmark del rival | [docs/COMPETENCIA.md](docs/COMPETENCIA.md) |
 
 ## Instalación
