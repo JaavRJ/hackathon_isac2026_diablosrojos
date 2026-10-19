@@ -15,7 +15,9 @@ Escala: `100` = promedio LMB, `110` = una desviación estándar mejor.
 |---|---|
 | Reglas para agentes | [AGENTS.md](AGENTS.md) |
 | Idea, física, métodos, entregables | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) |
-| Plan de sprints y tareas | [docs/PLAN.md](docs/PLAN.md) |
+| Plan de sprints y flujo Orquestador/Worker/Revisor | [docs/PLAN.md](docs/PLAN.md) |
+| Backlog detallado de 18 tareas (`HACK-001`..`018`) | [docs/TASKS.md](docs/TASKS.md) |
+| Contrato de columnas y firmas de código | [docs/CONTRACT.md](docs/CONTRACT.md) |
 | Benchmark del rival | [docs/COMPETENCIA.md](docs/COMPETENCIA.md) |
 
 ## Instalación

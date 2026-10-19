@@ -1,66 +1,100 @@
-# Plan de Implementación y Sprints — Diablos AeroVision
+# Plan de Implementación y Protocolo Multi-Agente — Diablos AeroVision
 
-> **Fecha de inicio del plan:** Lunes 19 de octubre de 2026  
 > **Entrega final:** Jueves 22 de octubre de 2026, 23:59 CDMX (`itamsportsanalytics@gmail.com`)  
-> **Regla de oro:** El núcleo obligatorio (P0: datos, modelos, validaciones, delta de altitud y simulador base) siempre tiene prioridad sobre los diferenciadores (P1: Pitch Sculptor y VeloVision) y extras (P2).
+> **Backlog detallado por tarea:** **[`docs/TASKS.md`](TASKS.md)**  
+> **Contrato de columnas y firmas:** **[`docs/CONTRACT.md`](CONTRACT.md)**
 
 ---
 
-## Mapa General de Sprints
+## 1. Protocolo de Trabajo en 3 Roles (Orquestador $\to$ Worker $\to$ Revisor Externo)
 
 ```mermaid
-flowchart LR
-    S1["Sprint 1 (Lun 19)\nDatos, ρ̂, pitch_id,\nArsenal y Targets LMB"] --> S2["Sprint 2 (Mar 20)\nStuff+ / Location+ / Pitching+,\nHoldouts y Canales H1-H4"]
-    S2 --> S3["Sprint 3 (Mié 21)\nDashboard P0 + Pitch Sculptor\n+ VeloVision"]
-    S3 --> S4["Sprint 4 (Jue 22)\nPaper 6-10 págs, Casos de\nEntrevista y Entrega"]
+stateDiagram-v2
+    [*] --> AVAILABLE
+    AVAILABLE --> IN_PROGRESS: Orquestador asigna a Worker barato
+    IN_PROGRESS --> REVIEW: Worker pasa pytest (exit 0)
+    REVIEW --> APPROVED: Revisor externo aprueba Checklist + diff
+    REVIEW --> CHANGES_REQUESTED: Revisor detecta falla (archivo:línea)
+    CHANGES_REQUESTED --> IN_PROGRESS: Worker corrige el punto exacto
+    APPROVED --> [*]
+```
+
+### A. Rol 1: Agente Orquestador (`ORCHESTRATOR`)
+1. Lee la tabla de estado en [`docs/TASKS.md`](TASKS.md).
+2. Selecciona todas las tareas en estado `AVAILABLE` cuyas dependencias (`DependsOn`) estén en `APPROVED`.
+3. Puede despachar **múltiples agentes ejecutores en paralelo** dentro de una misma *Ola (Wave)* porque cada tarea tiene su lista estricta de archivos permitidos (`AllowedPaths`) sin colisiones.
+4. Prompt estándar que el Orquestador le envía a cada Worker:
+   > *"Ejecuta únicamente la tarea `HACK-XXX`. Lee primero `AGENTS.md`, `docs/CONTRACT.md` y la sección `HACK-XXX` en `docs/TASKS.md`. Respeta estrictamente `AllowedPaths`, implementa el código y su test unitario, corre el comando `Verify` hasta obtener `exit code 0`, cambia el estado de `HACK-XXX` a `REVIEW` en `docs/TASKS.md` y entrega el output real de consola."*
+
+### B. Rol 2: Agente Ejecutor / Coder (`WORKER` — Modelo Rápido/Económico)
+1. **Alcance cerrado:** Solo puede crear o modificar los archivos listados en `AllowedPaths` de su tarea.
+2. **Cero adivinanzas:** Usa los nombres exactos de columnas y funciones de [`docs/CONTRACT.md`](CONTRACT.md).
+3. **Pruebas obligatorias:** Toda tarea incluye su archivo `tests/test_*.py` que corre en `< 5 s` usando el fixture sintético `synthetic_lmb_df`.
+4. **Prohibido dar por terminada la tarea** si el comando `Verify` no devuelve `0`.
+
+### C. Rol 3: Agente Revisor Independiente (`REVIEWER` — Otra Empresa/Modelo)
+1. Toma cualquier tarea en estado `REVIEW`.
+2. Ejecuta tres verificaciones objetivas:
+   - `git status` / `git diff`: ¿El Worker solo tocó archivos dentro de `AllowedPaths`?
+   - Ejecuta él mismo el comando `Verify` en terminal: ¿Pasa al 100 %?
+   - Revisa punto por punto el **`Reviewer Checklist`** de esa tarea en [`docs/TASKS.md`](TASKS.md) (cero *data leakage*, cero uso de `AutoPitchType` para comparar altitudes, cero números inventados).
+3. Prompt estándar para el Agente Revisor:
+   > *"Actúa como Revisor Independiente de la tarea `HACK-XXX`. Lee `AGENTS.md`, `docs/CONTRACT.md` y la especificación de `HACK-XXX` en `docs/TASKS.md`. Revisa el código modificado, ejecuta el comando `Verify` y evalúa cada casilla del `Reviewer Checklist`. Si todo cumple sin excepciones, marca `State: APPROVED` en `docs/TASKS.md`. Si algo falla, marca `State: CHANGES_REQUESTED` indicando `archivo:línea` y la corrección requerida."*
+
+---
+
+## 2. Grafo de Ejecución por Olas Paralelas (Waves)
+
+Gracias a que `AllowedPaths` está particionado, el Orquestador puede ejecutar las 18 tareas en **8 olas secuenciales**, corriendo en paralelo las tareas de una misma ola:
+
+```mermaid
+flowchart TD
+    subgraph S1["Sprint 1: Datos, Física (ρ̂), Identidad y Targets (P0)"]
+        W1["Ola 1: HACK-001\nEntorno, src/io.py y conftest.py"]
+        W2["Ola 2: HACK-002\nLimpieza y Features Físicas Base"]
+        W3A["Ola 3A: HACK-003\nDensidad Continua ρ̂"]
+        W3B["Ola 3B: HACK-004\nIdentidad Invariante pitch_id"]
+        W3C["Ola 3C: HACK-006\nTargets y xRV LMB"]
+        W4A["Ola 4A: HACK-005\nArsenal, Secuencia y 2 Túneles"]
+        W4B["Ola 4B: HACK-007\nSplits Oficiales y Baseline Nulo"]
+        W5["Ola 5: HACK-008\nPipeline Integrador Step 1"]
+        W1 --> W2
+        W2 --> W3A & W3B & W3C
+        W3B --> W4A
+        W3C --> W4B
+        W3A & W4A & W4B --> W5
+    end
+
+    subgraph S2["Sprint 2: Modelos, Holdouts y Canales H1-H4 (P0)"]
+        W6A["Ola 6A: HACK-009\nEtapa A: Traductor Físico"]
+        W6B["Ola 6B: HACK-011\nLocation+ y Pitching+"]
+        W7["Ola 7: HACK-010\nStuff+ Neutral y CDMX"]
+        W8A["Ola 8A: HACK-012\nSuite 3 Holdouts + Estabilidad"]
+        W8B["Ola 8B: HACK-013\nCanales Stuff vs Parque y H1-H4"]
+        W9["Ola 9: HACK-014\nExportador Oficial Scores y Agregados"]
+        W5 --> W6A & W6B
+        W6A --> W7
+        W7 & W6B --> W8A & W8B
+        W8A & W8B --> W9
+    end
+
+    subgraph S3_S4["Sprint 3 y 4: Producto, Sculptor, VeloVision y Paper (P0/P1)"]
+        W10A["Ola 10A: HACK-015\nDashboard Simulador Base (P0)"]
+        W10B["Ola 10B: HACK-016\nAI Pitch Sculptor (P1)"]
+        W10C["Ola 10C: HACK-017\nVeloVision + Validación Manual (P1)"]
+        W11["Ola 11: HACK-018\nIntegración UI, 3 Casos Entrevista y Paper 6-10 págs"]
+        W9 --> W10A & W10B & W10C
+        W10A & W10B & W10C --> W11
+    end
 ```
 
 ---
 
-## Sprint 1: Fundación de Datos, Física ($\hat{\rho}$), Identidad Invariante y Targets LMB (P0)
-**Objetivo:** Tener el dataset limpio, sin *data leakage*, con densidad continua por juego, identidad de pitcheo inmune al reetiquetado de TrackMan, ambos túneles y el `xRunValue` calibrado 100 % con datos de la LMB.
+## 3. Resumen de Sprints
 
-| ID | Tarea | Prio | Archivos / Rutas | Criterio de Aceptación y Verificación |
-| :--- | :--- | :---: | :--- | :--- |
-| **T1.1** | **Entorno, carga segura y limpieza base** | P0 | `src/config.py`<br>`src/io.py`<br>`src/schema.py` | `pyarrow >= 20` instalado. `EffectiveVelo` numérico; `altitude_category` imputada por moda de `game_anon_id`; mano del pitcher imputada por moda/signo de `RelSide`; filtro de anomalías de radar (`65 <= RelSpeed <= 105`). |
-| **T1.2** | **Densidad del aire continua ($\hat{\rho}$) por juego** | P0 | `src/physics/density.py`<br>`reports/altitude/game_density.csv` | Estima el índice de arrastre por juego a partir de la desaceleración de rectas (`ay0`, `vy0`, `SpeedDrop`, `RelSpeed`), suavizado por juego y normalizado a `No Altitude = 1.0`. Verifica que `Extreme Altitude` tenga $\hat{\rho}$ significativamente menor (~0.80–0.85). |
-| **T1.3** | **Identidad de pitcheo invariante (`pitch_id`)** | P0 | `src/features/identity.py`<br>`reports/altitude/relabeling_audit.csv` | Cuantifica el reetiquetado de `AutoPitchType` entre altitudes para los mismos pitchers y agrupa cada `(pitcher_anon_id, year)` usando solo variables en el punto de soltura (`RelSpeed`, `SpinRate`, `SpinAxis` cíclico, `RelHeight`, `RelSide`), asignando la etiqueta mayoritaria a nivel del mar. |
-| **T1.4** | **Features relacionales de arsenal, secuencia y ambos túneles** | P0 | `src/features/arsenal.py` | Calcula recta primaria por pitcher-año (definida en nivel del mar), `velo_diff_vs_fb`, `ivb_diff_vs_fb`, `hb_diff_vs_fb`, `pitch_usage_pct`, `prev_pitch_type` (verificando orden dentro de cada PA) y **ambas versiones** de `tunnel_similarity`: (a) distancia de release point (bases) y (b) distancia 3D a 170 ms con polinomios `PitchTrajectory*`. |
-| **T1.5** | **Targets multi-objetivo, `xRunValue` LMB y Splits oficiales** | P0 | `src/targets.py`<br>`src/splits.py`<br>`src/baseline.py` | Estima la matriz empírica de expectativa de carreras LMB por estado `Outs × Balls × Strikes` usando `RunsScored` y `OutsOnPlay` (2024–2025). Genera los 8 targets oficiales y define el **Baseline Nulo** (xRV medio por conteo) junto con los 3 splits: *Pitcher GroupKFold*, *Season (24–25 → 26)* y *Park (No+Med → Extreme)*. |
-
----
-
-## Sprint 2: Submodelos (Stuff+, Location+, Pitching+), Holdouts y Canales de Altitud (P0)
-**Objetivo:** Entrenar y validar los tres submodelos en sus sabores **neutral** y **CDMX**, superar el baseline nulo en los 3 holdouts, separar el *canal Stuff* del *canal parque* y demostrar empíricamente H1–H4.
-
-| ID | Tarea | Prio | Archivos / Rutas | Criterio de Aceptación y Verificación |
-| :--- | :--- | :---: | :--- | :--- |
-| **T2.1** | **Etapa A — Traductor físico de movimiento por densidad** | P0 | `src/models/movement.py` | Modelo con variación intra-pitcher que predice `InducedVertBreak` y `HorzBreak_norm` a partir de `(release, velo, spin, eje, \hat{\rho})`. Permite predecir cuánto movimiento pierde o gana cualquier lanzamiento al pasar de $\hat{\rho}_0 = 1.0$ a $\hat{\rho}_{\text{CDMX}}$. |
-| **T2.2** | **Entrenamiento de Stuff+, Location+ y Pitching+ (neutral y entorno)** | P0 | `src/models/stuff.py`<br>`src/models/location.py`<br>`src/models/pitching.py` | Tres modelos LightGBM separados respetando estrictamente las restricciones de columnas (§6 de `PROJECT_CONTEXT.md`). Predicen los 8 targets, los combinan mediante regresión hacia `xRV` y escalan a `100 + 10·z` tomando como referencia la LMB a $\hat{\rho}_0$. |
-| **T2.3** | ** Suite de Validación Fuera de Muestra y Estabilidad** | P0 | `analysis/run_validation.py`<br>`reports/validation/metrics_summary.csv` | Tabla de RMSE, Log-Loss y curvas de calibración superando al Baseline Nulo en: (1) *Pitcher Holdout*, (2) *Season Holdout 2026* y (3) *Park Holdout*. Incluye correlación año-a-año (2024 vs 2025) del Stuff+ por pitcher. |
-| **T2.4** | **Descomposición Canal Stuff vs. Canal Parque y Prueba de H1–H4** | P0 | `analysis/run_hypotheses.py`<br>`reports/altitude/delta_by_shape.csv`<br>`reports/altitude/channel_decomposition.csv` | Cuantifica con intervalos de confianza el $\Delta\text{Stuff+}$ por pitch shape en los mismos pitchers, separa qué porcentaje del castigo en `Extreme Altitude` proviene del menor quiebre (*canal Stuff*) vs mayor vuelo del batazo (*canal parque*), y genera las tablas/gráficas de **H1, H2, H3 y H4**. |
-| **T2.5** | **Exportación del Entregable 1 (Scores por Pitch, Pitcher y Arsenal)** | P0 | `analysis/export_scores.py`<br>`reports/leaderboards/pitcher_arsenal_summary.csv` | Genera el archivo local completo de scores por `PitchUID` (para entrega, ignorado en git) y los agregados limpios ($\le 2\text{ MB}$) por pitcher y repertorio listos para el dashboard. |
-
----
-
-## Sprint 3: Producto Interactivo — Simulador Base (P0), Pitch Sculptor (P1) y VeloVision (P1)
-**Objetivo:** Construir la herramienta para el pitching coach y director deportivo cumpliendo primero los 3 requisitos obligatorios de las bases y sumando nuestros dos módulos diferenciadores.
-
-| ID | Tarea | Prio | Archivos / Rutas | Criterio de Aceptación y Verificación |
-| :--- | :--- | :---: | :--- | :--- |
-| **T3.1** | **Dashboard Simulador Obligatorio (Núcleo UI)** | P0 | `dashboard/app.py`<br>`dashboard/components/` | App en español (tema rojo Diablos + negro) que corre sin datos crudos: (1) Entrada manual de pitch y cálculo en vivo de Stuff+, (2) Comparación lado a lado Harp Helú vs Nivel del Mar con pérdida de quiebre, (3) Mapa de movimiento de pitcheos más/menos efectivos y (4) Leaderboard + SHAP por pitcher. |
-| **T3.2** | **Motor AI Pitch Sculptor (Optimización con Factibilidad)** | P1 | `src/sculptor/optimizer.py`<br>`dashboard/pages/sculptor.py` | Dado un pitcheo o arsenal, busca en el vecindario real de pitchers con el mismo arm slot ($\pm 5^\circ$) y velocidad ($\pm 1.5\text{ mph}$) qué modificación de forma o mezcla de repertorio maximiza `Stuff+ CDMX`. Muestra los pitchers comparables reales de la LMB y la nota cualitativa de coaching. |
-| **T3.3** | **Módulo VeloVision (Video $\to$ Arm Slot $\to$ Rango Stuff+ CDMX)** | P1 | `src/vision/pose_slot.py`<br>`dashboard/pages/velovision.py` | Procesa un clip `.mp4` con MediaPipe Pose, detecta el frame de soltura, calcula el ángulo de brazo y release relativo, y devuelve el **rango intercuartílico (P25–P75) de Stuff+ CDMX** para ese slot (acotable al ingresar velocidad). |
-| **T3.4** | **Validación Empírica de VeloVision por Anotación Manual** | P1 | `analysis/validate_vision.py`<br>`reports/validation/vision_mae.csv` | Evalúa el error absoluto medio (MAE en grados) y acuerdo inter-anotador comparando el arm slot extraído por MediaPipe contra la marcación manual de 2 integrantes del equipo sobre 15–20 frames de prueba. |
-
----
-
-## Sprint 4: Recomendaciones Operativas, Documento Técnico (6–10 págs) y Entrevista (P1/P2)
-**Objetivo:** Traducir los hallazgos técnicos en decisiones de reclutamiento y coucheo para Diablos Rojos, redactar el paper técnico y blindar la entrevista de 10 minutos.
-
-| ID | Tarea | Prio | Archivos / Rutas | Criterio de Aceptación y Verificación |
-| :--- | :--- | :---: | :--- | :--- |
-| **T4.1** | **Entregables 2 y 3: Perfil Físico Ideal y Playbook de Scouting** | P1 | `docs/PERFIL_Y_RECOMENDACIONES.md` | Define el perfil físico y de arsenal que maximiza `Stuff+` y previene HR en el Harp Helú. Prepara los **3 casos ejecutivos para la entrevista de 10 min**: (a) un pitcher subvaluado en la liga ideal para firmar en CDMX, (b) un perfil "trampa de nivel del mar", y (c) un ajuste de secuencia/repertorio casa vs gira. |
-| **T4.2** | **Entregable 5: Documento Técnico (6–10 páginas)** | P1 | `docs/DOCUMENTO_TECNICO.md` | Integra marco teórico físico-sabermétrico, justificación de arquitectura y sustitutos de datos, definición formal de escala `Score+`, resultados de los 3 holdouts vs baseline nulo, descomposición de canales, validación de H1–H4 y fronteras/limitaciones del sistema. |
-| **T4.3** | **Extras Tácticos (Solo si P0 y P1 están al 100 %)** | P2 | `src/models/tactical_cf.py`<br>`analysis/team_communities.py` | (a) Reconstrucción de franquicias por comunidades de bateadores (Louvain) para aislar candidatos a local en Harp Helú; (b) Capa táctica de Causal Forest condicionada en conteo y secuencia previa. |
-| **T4.4** | **QA Final, Freeze y Empaquetado de Entrega** | P0 | `README.md`<br>`reports/` | Revisión de que ningún número carezca de respaldo en `reports/`, verificación de que no existan datos crudos en git, grabación de video demo de respaldo (Plan B) y armado del paquete para `itamsportsanalytics@gmail.com`. |
+| Sprint | Olas | Tareas | Entregable de Salida del Sprint |
+| :--- | :---: | :--- | :--- |
+| **Sprint 1 (Lun 19)** | Olas 1–5 | `HACK-001` a `HACK-008` | `data/stuff_processed_df.parquet`, $\hat{\rho}$ por juego, `pitch_id` invariante, ambos túneles, `xrv_pitcher` LMB y splits listos. |
+| **Sprint 2 (Mar 20)** | Olas 6–9 | `HACK-009` a `HACK-014` | Modelos `Stuff+`, `Location+`, `Pitching+` (neutral y CDMX), tablas de los 3 holdouts superando al baseline nulo, descomposición de canales, H1–H4 y Entregable 1 exportado. |
+| **Sprint 3 (Mié 21)** | Ola 10 | `HACK-015` a `HACK-017` | Dashboard Simulador Obligatorio (`P0`) + motor prescriptivo **Pitch Sculptor** (`P1`) + **VeloVision** validado (`P1`). |
+| **Sprint 4 (Jue 22)** | Ola 11 | `HACK-018` | Perfil Físico Ideal, 3 casos para la entrevista de 10 min, Documento Técnico de 6–10 páginas y paquete final de entrega. |
