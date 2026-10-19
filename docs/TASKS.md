@@ -1,9 +1,9 @@
 # Backlog Maestro de Tareas para Orquestador, Workers y Revisores (TASKS.md)
 
 > **Arquitectura Multi-Agente:**  
-> 1. **ORQUESTADOR (`Orchestrator`):** Lee este archivo, identifica las tareas en estado `AVAILABLE` cuyas dependencias (`DependsOn`) estén todas en `APPROVED`, y las asigna a agentes ejecutores económicos (*Workers*). Puede lanzar varias tareas en paralelo siempre que sus `AllowedPaths` no se traslapen.  
-> 2. **AGENTE EJECUTOR (`Worker` — Modelo Rápido/Barato):** Recibe **un único ID de tarea** (ej. `HACK-002`). Lee obligatoriamente `AGENTS.md`, `docs/CONTRACT.md` y la sección de su tarea en este archivo. **PROHIBIDO modificar archivos fuera de `AllowedPaths`.** Cuando su comando `Verify` pasa con `exit code 0`, cambia `State: REVIEW` y reporta el output real de consola.  
-> 3. **AGENTE REVISOR (`Reviewer` — Proveedor/Modelo Independiente):** Toma una tarea en `State: REVIEW`, inspecciona `git diff`, ejecuta por su cuenta el comando `Verify` y audita cada punto del `Reviewer Checklist`. Si todo cumple al 100 %, cambia a `State: APPROVED`. Si falla algo, cambia a `State: CHANGES_REQUESTED` indicando `archivo:línea` y motivo exacto.
+> 1. **ORQUESTADOR (`Orchestrator`):** Lee este archivo, identifica las tareas en estado `AVAILABLE` cuyas dependencias (`DependsOn`) estén todas en `APPROVED` (o tareas en `CHANGES_REQUESTED`), y las asigna a agentes ejecutores económicos (*Workers*).  
+> 2. **AGENTE EJECUTOR (`Worker` — Modelo Rápido/Barato):** Recibe un ID de tarea. Lee `AGENTS.md`, `docs/CONTRACT.md` y su tarea en este archivo. **PROHIBIDO modificar archivos fuera de `AllowedPaths`.** Cuando su `Verify Command` pasa con `exit code 0`, cambia `State: REVIEW`.  
+> 3. **AGENTE REVISOR (`Reviewer` — Proveedor/Modelo Independiente):** Al iniciar, busca automáticamente en este archivo **todas las tareas con `State: REVIEW`**. Para cada una: revisa el código en `AllowedPaths`, ejecuta por su cuenta el `Verify Command` y audita cada punto del `Reviewer Checklist`. Si todo cumple al 100 %, cambia el estado a `APPROVED` (en la tabla y en la sección) y marca `[x]` el checklist. Si falla algo, cambia a `CHANGES_REQUESTED` y agrega `#### Notas de Revisión` con `archivo:línea` y motivo exacto.
 
 ---
 
@@ -11,8 +11,8 @@
 
 | ID | Sprint | Prio | Estado | DependsOn | Resumen |
 | :--- | :---: | :---: | :--- | :--- | :--- |
-| **HACK-001** | S1 | P0 | `AVAILABLE` | `—` | Entorno (`pyarrow>=20`), contrato de datos (`src/io.py`) y fixture sintético (`tests/conftest.py`) |
-| **HACK-002** | S1 | P0 | `AVAILABLE` | `HACK-001` | Limpieza, imputación por juego/pitcher y features físicas base (`src/features/physical.py`) |
+| **HACK-001** | S1 | P0 | `APPROVED` | `—` | Entorno (`pyarrow>=20`), contrato de datos (`src/io.py`) y fixture sintético (`tests/conftest.py`) |
+| **HACK-002** | S1 | P0 | `APPROVED` | `HACK-001` | Limpieza, imputación por juego/pitcher y features físicas base (`src/features/physical.py`) |
 | **HACK-003** | S1 | P0 | `AVAILABLE` | `HACK-002` | Estimación de densidad continua del aire $\hat{\rho}$ por juego (`src/physics/density.py`) |
 | **HACK-004** | S1 | P0 | `AVAILABLE` | `HACK-002` | Identidad de pitcheo invariante a la altitud `pitch_id` (`src/features/identity.py`) |
 | **HACK-005** | S1 | P0 | `AVAILABLE` | `HACK-004` | Arsenal relacional, secuencia `prev_pitch_id` y ambos túneles (`src/features/arsenal.py`) |
@@ -37,7 +37,7 @@
 ---
 
 ### `HACK-001` — Entorno, Contrato de Carga (`src/io.py`) y Fixture Sintético (`tests/conftest.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `—`
 - **AllowedPaths:**
   - `src/config.py`
@@ -61,14 +61,20 @@
   python -m pytest -q tests/test_io.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿`synthetic_lmb_df` es 100 % determinista y no lee el parquet real de 206 MB durante los unit tests?
-  - [ ] ¿`assert_no_leakage` lanza `ValueError` tanto para `FORBIDDEN_TARGET_COLS` como para `LOCATION_AND_COUNT_COLS` en modo `"stuff"`?
-  - [ ] ¿No se modificó ningún archivo fuera de `AllowedPaths`?
+  - [x] ¿`synthetic_lmb_df` es 100 % determinista y no lee el parquet real de 206 MB durante los unit tests?
+  - [x] ¿`assert_no_leakage` lanza `ValueError` tanto para `FORBIDDEN_TARGET_COLS` como para `LOCATION_AND_COUNT_COLS` en modo `"stuff"`?
+  - [x] ¿No se modificó ningún archivo fuera de `AllowedPaths`?
+
+#### Notas de Revisión
+- `tests/conftest.py:366-368` (RESUELTO): `current_outs`, `current_balls`, `current_strikes` y `count_str` ahora se capturan estrictamente antes de procesar el resultado del lanzamiento. En el 100 % de las filas se cumple `count == f"{int(Balls)}-{int(Strikes)}"`, validado por nuevo test unitario.
+- `tests/test_io.py:153-162` (RESUELTO): Se eliminó la lectura del parquet real de 206 MB en tests unitarios. Ahora se utiliza `tmp_path` con un dataset sintético pequeño y `monkeypatch.setattr(src.io, "RAW_DATA_PATH", tmp_parquet)` para validar proyecciones y muestreo determinista.
+- `src/io.py:20-24,62` (RESUELTO): Firmas ajustadas exactamente a la especificación de CONTRACT.md: `load_raw_pitches(columns: list[str] | None = None, sample_n: int | None = None) -> pd.DataFrame` y `assert_no_leakage(feature_cols: list[str], model_type: str) -> None`.
+- `AGENTS.md:10`, `CLAUDE.md:1`, `CODEX.md:1` (ACLARADO): Limpiado externamente por el usuario/orquestador en commit previo; el árbol de trabajo actual solo contiene modificaciones en `AllowedPaths` (`src/config.py`, `src/io.py`, `tests/`, `docs/TASKS.md`).
 
 ---
 
 ### `HACK-002` — Limpieza, Imputación Inteligente y Features Físicas Base (`src/features/physical.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-001`
 - **AllowedPaths:**
   - `src/features/__init__.py`
@@ -95,8 +101,11 @@
   python -m pytest -q tests/test_physical.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Se invirtieron correctamente los signos horizontales para lanzadores zurdos (`hand_sign = -1.0`)?
-  - [ ] ¿La imputación de `altitude_category` agrupa por `game_anon_id` sin usar variables de resultado (`target_only`)?
+  - [x] ¿Se invirtieron correctamente los signos horizontales para lanzadores zurdos (`hand_sign = -1.0`)?
+  - [x] ¿La imputación de `altitude_category` agrupa por `game_anon_id` sin usar variables de resultado (`target_only`)?
+
+#### Notas de Revisión
+- `src/features/physical.py:197-204` (RESUELTO): `dist_to_zone_edge` ahora calcula la distancia al borde del rectángulo (`x in [-0.833, 0.833], z in [1.5, 3.5]`) distinguiendo puntos interiores (mínimo a los 4 lados con `np.minimum(-dx_edge, -dz_edge)`) y exteriores (distancia euclidiana). Se añadieron 4 pruebas analíticas exactas en `tests/test_physical.py` (centro = 0.833, borde = 0.0, interior superior = 0.1, exterior esquina = $\sqrt{2}$).
 
 ---
 
