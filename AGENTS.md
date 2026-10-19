@@ -7,6 +7,25 @@
 
 ---
 
+## 0. Protocolo Autónomo por Rol (Léelo al iniciar sesión)
+
+- **Si eres el AGENTE REVISOR (`Reviewer`):**
+  1. Abre [`docs/TASKS.md`](docs/TASKS.md) y busca automáticamente **todas las tareas cuyo estado sea `REVIEW`**.
+  2. Para cada tarea en `REVIEW`:
+     - Verifica que solo se hayan tocado archivos dentro de su lista `AllowedPaths`.
+     - Lee el código implementado y contrástalo contra [`docs/CONTRACT.md`](docs/CONTRACT.md) y la especificación de la tarea.
+     - Ejecuta tú mismo en terminal el `Verify Command` de esa tarea y comprueba que pase con `exit code 0`.
+     - Evalúa rigurosamente cada punto de su `Reviewer Checklist`.
+  3. **Veredicto en [`docs/TASKS.md`](docs/TASKS.md):**
+     - Si cumple el 100 % sin excepciones: cambia el estado de la tarea de `REVIEW` a `APPROVED` (tanto en la tabla global como en el encabezado de la tarea) y marca `[x]` las casillas de su `Reviewer Checklist`.
+     - Si falla cualquier punto: cambia el estado a `CHANGES_REQUESTED` y agrega debajo de la tarea una subsección `#### Notas de Revisión` con `archivo:línea` y la corrección exacta requerida.
+- **Si eres un AGENTE EJECUTOR (`Worker`):**
+  Ejecuta únicamente el ID de tarea asignado, respeta `AllowedPaths`, haz pasar el `Verify Command` (`exit code 0`) y pon la tarea en `REVIEW` en [`docs/TASKS.md`](docs/TASKS.md).
+- **Si eres el ORQUESTADOR (`Orchestrator`):**
+  Despacha a Workers económicos las tareas en `AVAILABLE` cuyas dependencias (`DependsOn`) estén en `APPROVED`, o re-despacha las que estén en `CHANGES_REQUESTED`.
+
+---
+
 ## 1. Decisiones cerradas (no reabrir)
 1. Reto 2 (Diablos Rojos). El Reto 1 (Club América) está descartado.
 2. El **núcleo obligatorio** (modelos + features de arsenal + delta por altitud + holdouts + dashboard simulador base) va antes que los extras (Sculptor, VeloVision). Si hay conflicto de tiempo, gana lo obligatorio.
