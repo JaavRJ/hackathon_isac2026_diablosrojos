@@ -20,7 +20,7 @@
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
-| **HACK-010** | S2 | P0 | `IN_PROGRESS` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
+| **HACK-010** | S2 | P0 | `CHANGES_REQUESTED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
 | **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
 | **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
@@ -333,7 +333,7 @@
 ---
 
 ### `HACK-010` — Submodelo `Stuff+` en Sabores Neutral y CDMX (`src/models/stuff.py`)
-- **State:** `IN_PROGRESS`
+- **State:** `CHANGES_REQUESTED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-009`
 - **AllowedPaths:**
   - `src/models/stuff.py`
@@ -363,6 +363,18 @@
 - **Reviewer Checklist:**
   - [ ] **CRÍTICO:** ¿`stuff_plus_cdmx` se normaliza usando $(\mu_{\text{neutral}}, \sigma_{\text{neutral}})$ de nivel del mar? (Si se re-estandarizara a media 100 dentro de CDMX, el promedio de `delta_stuff_cdmx` sería artificialmente 0 y borraría el efecto de la altitud).
   - [ ] ¿Se excluyeron todas las variables de `PlateLoc*`, `count`, `Balls`, `Strikes` y `BatterSide` de `Stuff+` puro?
+
+#### Notas de Revisión
+- `src/models/stuff.py:328`: `target_preds_dict` se llena con predicciones sobre las mismas filas usadas para ajustar cada submodelo; en `src/models/stuff.py:377` se entrena `Ridge(alpha=1.0, positive=True)` sobre ellas. La especificación exige predicciones *out-of-fold* y selección de regularización por validación cruzada. Genera predicciones OOF por `pitcher_anon_id` para los 8 submodelos, ajusta el combinador con esas predicciones y selecciona `alpha` mediante CV manteniendo coeficientes no negativos; después reajusta los submodelos para inferencia. Agrega una prueba que demuestre que ninguna fila del meta-entrenamiento fue predicha por un submodelo entrenado con ella.
+- `src/models/stuff.py:343`: El regresor directo de `xrv_pitcher` se ajusta con todas las altitudes, aunque su etiqueta incluye el efecto de parque en bolas bateadas; limitar solo el ajuste del combinador a `No Altitude` en la línea 364 no elimina esa contaminación de las predicciones base. Entrena ese componente con una etiqueta de canal Stuff neutralizada respecto al parque, o ajústalo exclusivamente con observaciones `No Altitude` y documenta la limitación. Verifica con una prueba que alterar los resultados de bolas bateadas solo en `Extreme Altitude` no cambie el ajuste del canal Stuff.
+- `src/models/stuff.py:470`: Los dos sabores usan `ivb_diff_vs_fb` y `hb_diff_vs_fb` tal como salen del traductor, que suma el cambio del pitcheo sin traducir la recta primaria de referencia. Recalcula ambos diferenciales contra la recta primaria traducida a la misma densidad antes de evaluar cada sabor, como exige la especificación, y prueba la consistencia del diferencial para un pitcher con recta y pitcheo secundario.
+
+**Segunda revisión (51 pruebas pasan):**
+- `src/models/stuff.py:417`: El filtro nuevo excluye solo `Extreme Altitude`; `Medium Altitude` sigue aportando etiquetas de `xrv_pitcher` y bolas bateadas afectadas por el carry del parque al canal Stuff. Ajusta los submodelos de resultado con observaciones `No Altitude` o con etiquetas neutralizadas por parque antes del ajuste OOF y final. Amplía la prueba de invariancia para alterar también los resultados de `Medium Altitude` y comprobar que el canal Stuff no cambia.
+- `src/models/stuff.py:309`: `_recompute_arsenal_diffs_at_density` toma la media de las rectas presentes en el lote de predicción. Así, el mismo slider puede tener otro `ivb_diff_vs_fb` y otro score al predecirse solo o junto con más rectas del mismo pitcher. Guarda durante `fit` la referencia de la recta primaria por `(pitcher_anon_id, year)` y tradúcela a la densidad objetivo para todos los lotes; no derives la referencia de las filas que casualmente acompañan al lanzamiento. Agrega una prueba de invariancia de `predict_scores` entre una fila aislada y esa misma fila dentro de un lote.
+
+**Tercera revisión (52 pruebas pasan):**
+- `src/models/stuff.py:782`: `explain_pitch` calcula TreeSHAP solo para `self.booster_`, el regresor directo de `xrv_pitcher`, pero llama a esas contribuciones puntos de `Stuff+` en las líneas 786–789. El score real sale de `_predict_stuff_value`, que combina ocho submodelos con `self.meta_ridge_`; por tanto, `base_value + sum(shap_values)` no reconstruye el score que se muestra. Calcula atribuciones del modelo combinado en la misma escala neutral, o presenta estas contribuciones explícitamente como explicación exclusiva del regresor directo y agrega una explicación del score final. Añade una prueba de aditividad que compare las contribuciones reportadas con el `Stuff+` correspondiente al mismo lanzamiento.
 
 ---
 
