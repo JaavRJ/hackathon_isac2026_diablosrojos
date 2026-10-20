@@ -19,9 +19,9 @@
 | **HACK-006** | S1 | P0 | `APPROVED` | `HACK-002` | Calibración LMB de `xrv_pitcher` y los 8 targets multi-objetivo (`src/targets.py`) |
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
-| **HACK-009** | S2 | P0 | `AVAILABLE` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
+| **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
 | **HACK-010** | S2 | P0 | `AVAILABLE` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
-| **HACK-011** | S2 | P0 | `AVAILABLE` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
+| **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
 | **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
 | **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
 | **HACK-014** | S2 | P0 | `AVAILABLE` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
@@ -300,7 +300,7 @@
 ---
 
 ### `HACK-009` — Etapa A: Traductor Físico Intra-Pitcher de Movimiento por Densidad (`src/models/movement.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-008`
 - **AllowedPaths:**
   - `src/models/__init__.py`
@@ -324,8 +324,11 @@
   python -m pytest -q tests/test_movement.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Se conserva el residuo individual del pitcheo ($\text{IVB}_{\text{obs}} + \hat{f}(\rho^*) - \hat{f}(\hat{\rho}_{\text{obs}})$) en vez de reemplazar todo el movimiento por una media suave?
-  - [ ] ¿Ninguna variable de ubicación ni resultado entra en `PhysicsMovementTranslator`?
+  - [x] ¿Se conserva el residuo individual del pitcheo ($\text{IVB}_{\text{obs}} + \hat{f}(\rho^*) - \hat{f}(\hat{\rho}_{\text{obs}})$) en vez de reemplazar todo el movimiento por una media suave?
+  - [x] ¿Ninguna variable de ubicación ni resultado entra en `PhysicsMovementTranslator`?
+
+#### Notas de Revisión
+- `src/models/movement.py:255-315` (RESUELTO): Los regresores de magnitud de IVB y HB (`_model_mag_ivb`, `_model_mag_hb`) ahora se ajustan condicionados por el quiebre base en release (`_model_base_ivb`, `_model_base_hb`), incorporando la interacción explícita `rho_x_base_mag = rho_hat * abs(base_break)` y `monotone_constraints` (`+1` en `rho_hat` y `+1` en `rho_x_base_mag`), preservando el residuo individual observado. Validado en `test_signed_break_response_across_densities` para IVB positivo, IVB negativo y HB de ambos signos.
 
 ---
 
@@ -364,7 +367,7 @@
 ---
 
 ### `HACK-011` — Submodelos `Location+` y `Pitching+` Multi-Target (`src/models/location_pitching.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-008`
 - **AllowedPaths:**
   - `src/models/location_pitching.py`
@@ -386,8 +389,12 @@
   python -m pytest -q tests/test_location_pitching.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿`LocationPlusModel` no tiene acceso a `RelSpeed`, `SpinRate`, `InducedVertBreak` ni `HorzBreak`?
-  - [ ] ¿`PitchingPlusModel` predice los 8 targets completos de la tabla de las bases?
+  - [x] ¿`LocationPlusModel` no tiene acceso a `RelSpeed`, `SpinRate`, `InducedVertBreak` ni `HorzBreak`?
+  - [x] ¿`PitchingPlusModel` predice los 8 targets completos de la tabla de las bases?
+
+#### Notas de Revisión
+- `src/models/location_pitching.py:85-185` (RESUELTO): Se eliminó `LOCATION_MODEL_FEATURES` y se retiró `rho_hat` de `LocationPlusModel`. `assert_valid_location_features` valida mediante whitelist estricta contra `LOCATION_FEATURES`, rechazando cualquier otra variable física no enumerada, y `location_plus_neutral` y `location_plus_cdmx` se evalúan en la misma escala neutral.
+- `src/models/location_pitching.py:375-420` (RESUELTO): Se eliminó el valor fijo `0.82` y la afirmación en docstrings; ahora `PitchingPlusModel.fit` calcula empíricamente `self.rho_extreme_median_` a partir de `Extreme Altitude` en los datos de entrenamiento ($\approx 0.852$ en LMB 2024–25, documentando que agrupa varios parques de altura).
 
 ---
 
