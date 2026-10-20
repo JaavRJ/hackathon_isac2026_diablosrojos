@@ -18,7 +18,7 @@
 | **HACK-005** | S1 | P0 | `APPROVED` | `HACK-004` | Arsenal relacional, secuencia `prev_pitch_id` y ambos túneles (`src/features/arsenal.py`) |
 | **HACK-006** | S1 | P0 | `APPROVED` | `HACK-002` | Calibración LMB de `xrv_pitcher` y los 8 targets multi-objetivo (`src/targets.py`) |
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
-| **HACK-008** | S1 | P0 | `REVIEW` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
+| **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `AVAILABLE` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
 | **HACK-010** | S2 | P0 | `AVAILABLE` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `AVAILABLE` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
@@ -275,7 +275,7 @@
 ---
 
 ### `HACK-008` — Pipeline Integrador del Dataset Procesado (`src/pipeline_step1.py`)
-- **State:** `REVIEW`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-003, HACK-005, HACK-007`
 - **AllowedPaths:**
   - `src/pipeline_step1.py`
@@ -294,8 +294,8 @@
   python -m pytest -q tests/test_pipeline_step1.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿El ajuste de `fit_lmb_run_values` dentro del pipeline usa solo `year.isin([2024, 2025])` antes de transformar `2026`?
-  - [ ] ¿Los archivos en `reports/altitude/` pesan menos de 2 MB y no contienen filas pitch-by-pitch?
+  - [x] ¿El ajuste de `fit_lmb_run_values` dentro del pipeline usa solo `year.isin([2024, 2025])` antes de transformar `2026`?
+  - [x] ¿Los archivos en `reports/altitude/` pesan menos de 2 MB y no contienen filas pitch-by-pitch?
 
 ---
 
