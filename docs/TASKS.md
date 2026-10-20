@@ -22,8 +22,8 @@
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
 | **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
-| **HACK-012** | S2 | P0 | `IN_PROGRESS` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
-| **HACK-013** | S2 | P0 | `IN_PROGRESS` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
+| **HACK-012** | S2 | P0 | `REVIEW` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
+| **HACK-013** | S2 | P0 | `REVIEW` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
 | **HACK-014** | S2 | P0 | `AVAILABLE` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `AVAILABLE` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `AVAILABLE` | `HACK-014` | Motor **AI Pitch Sculptor** con restricción de factibilidad + pestaña UI (`src/sculptor/optimizer.py`) |
@@ -414,7 +414,7 @@
 ---
 
 ### `HACK-012` — Suite de Validación en los 3 Holdouts vs Baseline Nulo (`analysis/run_validation.py`)
-- **State:** `IN_PROGRESS`
+- **State:** `REVIEW`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/__init__.py`
@@ -442,10 +442,14 @@
 - **Reviewer Checklist:**
   - [ ] ¿En cada fold/holdout tanto `PhysicsMovementTranslator` como los modelos se ajustan **únicamente con `train_idx`** antes de predecir en `test_idx`?
 
+#### Nota de ejecución
+- Corrida completa sobre 634,624 filas; cinco folds de pitcher, season 2026 y park Extreme. Los tres reportes agregados están en `reports/validation/`. Verify: 5 passed. Estabilidad 2024–2025 calculada in-sample y etiquetada así en el CSV.
+- La aceptación de superioridad no se cumple por completo: promediando los 7 holdouts, Stuff+ empeora frente al baseline en `target_called_strike` (RMSE 0.346396 vs 0.341924; Log-Loss 0.387399 vs 0.378871) y `target_out_on_pitch` (RMSE 0.365079 vs 0.356838; Log-Loss 0.428773 vs 0.411817). En Park, Stuff+ también empeora RMSE de `xrv_pitcher` (0.211703 vs 0.211461). Se conservan las métricas observadas sin forzar superioridad.
+
 ---
 
 ### `HACK-013` — Descomposición Canal Stuff vs. Canal Parque y Pruebas H1–H4 (`analysis/run_hypotheses.py`)
-- **State:** `IN_PROGRESS`
+- **State:** `REVIEW`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/run_hypotheses.py`
@@ -477,6 +481,14 @@
 - **Reviewer Checklist:**
   - [ ] ¿Se usó `pitch_id` invariante (y no solo `AutoPitchType`) para no contaminar H1 y H2 con el reetiquetado de TrackMan?
   - [ ] ¿Los errores estándar están agrupados por `pitcher_anon_id`?
+
+#### Nota de ejecución
+- Los reportes de HACK-013 fueron retirados; no se actualizaron ni se reentrenó el análisis en esta corrida. No hubo autorización para reconstruirlos.
+
+#### Notas de Revisión
+- `analysis/run_hypotheses.py:116-150`: `park = total - stuff` absorbe diferencias de conteo, localización, temporada y cualquier otro factor, mientras que `park_batted_ball_controlled` queda como diagnóstico separado y no reconstruye el total. La tarea exige que el canal parque represente el cambio adicional de xRV en pelotas en juego para igual `ExitSpeed` y `Angle`. Estima ese contraste condicionado sobre pelotas en juego y los mismos pitchers comparables, incorpóralo a una descomposición aditiva con el canal Stuff, y reporta explícitamente cualquier residuo no atribuido sin llamarlo canal parque. Si los datos no permiten identificarlo, marca el canal como no estimable en vez de asignarle todo el residuo.
+- `analysis/run_hypotheses.py:190-217`: H3 calcula `gb_rate` por pitcher y altitud, incluye pitchers que solo aparecen en una categoría y ajusta una interacción entre grupos distintos. Restringe H3 a pitchers observados en ambas altitudes y usa una tasa de roletazos por pitcher definida de forma estable para comparar el cambio intra-pitcher de xRV y HR; conserva el bootstrap agrupado por `pitcher_anon_id` y documenta los controles o límites de identificación.
+- `tests/test_hypotheses_channels.py:1-87`: añade pruebas que distingan un aumento de HR/carry solo en pelotas en juego de un cambio en otros resultados, y que comprueben que H3 excluye pitchers sin par de altitudes. El `Verify Command` actual pasa (4 pruebas), pero no detecta los dos incumplimientos anteriores.
 
 ---
 
