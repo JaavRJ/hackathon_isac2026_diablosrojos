@@ -20,7 +20,7 @@
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
-| **HACK-010** | S2 | P0 | `CHANGES_REQUESTED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
+| **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
 | **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
 | **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
@@ -333,7 +333,7 @@
 ---
 
 ### `HACK-010` — Submodelo `Stuff+` en Sabores Neutral y CDMX (`src/models/stuff.py`)
-- **State:** `CHANGES_REQUESTED`
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-009`
 - **AllowedPaths:**
   - `src/models/stuff.py`
@@ -361,8 +361,8 @@
   python -m pytest -q tests/test_stuff.py
   ```
 - **Reviewer Checklist:**
-  - [ ] **CRÍTICO:** ¿`stuff_plus_cdmx` se normaliza usando $(\mu_{\text{neutral}}, \sigma_{\text{neutral}})$ de nivel del mar? (Si se re-estandarizara a media 100 dentro de CDMX, el promedio de `delta_stuff_cdmx` sería artificialmente 0 y borraría el efecto de la altitud).
-  - [ ] ¿Se excluyeron todas las variables de `PlateLoc*`, `count`, `Balls`, `Strikes` y `BatterSide` de `Stuff+` puro?
+  - [x] **CRÍTICO:** ¿`stuff_plus_cdmx` se normaliza usando $(\mu_{\text{neutral}}, \sigma_{\text{neutral}})$ de nivel del mar? (Si se re-estandarizara a media 100 dentro de CDMX, el promedio de `delta_stuff_cdmx` sería artificialmente 0 y borraría el efecto de la altitud).
+  - [x] ¿Se excluyeron todas las variables de `PlateLoc*`, `count`, `Balls`, `Strikes` y `BatterSide` de `Stuff+` puro?
 
 #### Notas de Revisión
 - `src/models/stuff.py:328`: `target_preds_dict` se llena con predicciones sobre las mismas filas usadas para ajustar cada submodelo; en `src/models/stuff.py:377` se entrena `Ridge(alpha=1.0, positive=True)` sobre ellas. La especificación exige predicciones *out-of-fold* y selección de regularización por validación cruzada. Genera predicciones OOF por `pitcher_anon_id` para los 8 submodelos, ajusta el combinador con esas predicciones y selecciona `alpha` mediante CV manteniendo coeficientes no negativos; después reajusta los submodelos para inferencia. Agrega una prueba que demuestre que ninguna fila del meta-entrenamiento fue predicha por un submodelo entrenado con ella.
@@ -375,6 +375,9 @@
 
 **Tercera revisión (52 pruebas pasan):**
 - `src/models/stuff.py:782`: `explain_pitch` calcula TreeSHAP solo para `self.booster_`, el regresor directo de `xrv_pitcher`, pero llama a esas contribuciones puntos de `Stuff+` en las líneas 786–789. El score real sale de `_predict_stuff_value`, que combina ocho submodelos con `self.meta_ridge_`; por tanto, `base_value + sum(shap_values)` no reconstruye el score que se muestra. Calcula atribuciones del modelo combinado en la misma escala neutral, o presenta estas contribuciones explícitamente como explicación exclusiva del regresor directo y agrega una explicación del score final. Añade una prueba de aditividad que compare las contribuciones reportadas con el `Stuff+` correspondiente al mismo lanzamiento.
+
+**Cuarta revisión (53 pruebas pasan):**
+- `src/models/stuff.py:617`: `mu_neutral_` y `sigma_neutral_` se calculan con `df_stuff_train`, que desde la línea 464 contiene solo lanzamientos de `No Altitude`. `docs/CONTRACT.md` §3 y el criterio de HACK-010 definen la referencia como los pitcheos LMB de la temporada evaluados a densidad neutral, incluidos los observados en `Medium` y `Extreme Altitude`. Mantén el entrenamiento de resultados en `No Altitude` para evitar carry, pero calibra la escala con todos los lanzamientos del conjunto de referencia `df_train` traducidos a `rho_hat=1.000` y con los diferenciales de arsenal recalculados. Cambia la prueba de media 100/desviación 10 para evaluar ese conjunto LMB completo, no solo `No Altitude`.
 
 ---
 

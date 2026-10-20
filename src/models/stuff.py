@@ -613,14 +613,14 @@ class StuffPlusModel:
         self.submodels_["xrv_pitcher"] = reg_xrv
         self.booster_ = reg_xrv.booster_
 
-        # 12. Calibración de Escala Neutral (rho_0 = 1.000) con recálculo dinámico de arsenal
-        df_neutral_train = self.movement_translator_.translate_movement(df_stuff_train, target_rho=1.000)
-        df_neutral_train = self._recompute_arsenal_diffs_at_density(
-            df_neutral_train, target_rho=1.000, translator=self.movement_translator_, orig_df=df_stuff_train
+        # 12. Calibración de Escala Neutral (rho_0 = 1.000) sobre todos los lanzamientos LMB de referencia
+        df_neutral_ref = self.movement_translator_.translate_movement(df_train, target_rho=1.000)
+        df_neutral_ref = self._recompute_arsenal_diffs_at_density(
+            df_neutral_ref, target_rho=1.000, translator=self.movement_translator_, orig_df=df_train
         )
-        pred_neutral_train = self._predict_stuff_value(df_neutral_train)
-        self.mu_neutral_ = float(np.mean(pred_neutral_train))
-        std_val = float(np.std(pred_neutral_train, ddof=0))
+        pred_neutral_ref = self._predict_stuff_value(df_neutral_ref)
+        self.mu_neutral_ = float(np.mean(pred_neutral_ref))
+        std_val = float(np.std(pred_neutral_ref, ddof=0))
         self.sigma_neutral_ = float(max(std_val, 1e-6))
 
         self.is_fitted_ = True
@@ -741,26 +741,37 @@ class StuffPlusModel:
 
         return pd.DataFrame(raw_preds, index=df.index)[TARGET_COLS].astype(np.float64)
 
-    def explain_pitch(self, df_row: pd.DataFrame | pd.Series) -> dict[str, Any]:
+    def explain_pitch(
+        self,
+        df_row: pd.DataFrame | pd.Series,
+        target_rho: float = 1.0,
+    ) -> dict[str, Any]:
         """
         Calcula la explicabilidad local exacta TreeSHAP para un lanzamiento individual
-        mediante booster_.predict(X_row, pred_contrib=True).
+        en la escala combinada de Stuff+ (respetando la propiedad aditiva exacta del
+        ensamble meta_ridge_ sobre los 8 submodelos).
 
         Parameters
         ----------
         df_row : pd.DataFrame | pd.Series
             Fila con los atributos del lanzamiento. Si contiene múltiples filas, se utiliza la primera.
+        target_rho : float, default=1.0
+            Densidad del aire objetivo para la explicación (1.000 para sabor neutral o rho_cdmx).
 
         Returns
         -------
         dict[str, Any]
             Diccionario con:
             - 'base_value': Valor base en escala Stuff+.
-            - 'shap_values': dict con la contribución SHAP de cada feature en puntos de Stuff+.
+            - 'shap_values': dict con la contribución de cada feature en puntos de Stuff+,
+              garantizando: base_value + sum(shap_values.values()) == predicted_stuff_plus.
+            - 'predicted_stuff_plus': Score final Stuff+ en target_rho.
             - 'top_positive_features': lista de tuplas (feature, contribución) con impacto positivo.
             - 'top_negative_features': lista de tuplas (feature, contribución) con impacto negativo.
-            - 'raw_base_value': Valor base en escala directa xrv_pitcher.
-            - 'raw_shap_values': dict con las contribuciones TreeSHAP en escala xrv_pitcher.
+            - 'direct_xrv_base_value': Valor base en escala directa xrv_pitcher.
+            - 'direct_xrv_shap_values': dict con las contribuciones TreeSHAP en escala xrv_pitcher.
+            - 'raw_base_value': Alias de direct_xrv_base_value para compatibilidad.
+            - 'raw_shap_values': Alias de direct_xrv_shap_values para compatibilidad.
         """
         if not self.is_fitted_:
             raise RuntimeError("StuffPlusModel debe entrenarse con fit() antes de explain_pitch().")
@@ -772,24 +783,103 @@ class StuffPlusModel:
         else:
             raise ValueError("df_row debe ser un pd.DataFrame o pd.Series.")
 
+        # 1. Traducir movimiento y diferenciales de arsenal a target_rho
+        trans = self.movement_translator_
+        if trans is not None and hasattr(trans, "translate_movement"):
+            row_trans = trans.translate_movement(row_df, target_rho=float(target_rho))
+            row_trans = self._recompute_arsenal_diffs_at_density(
+                row_trans, target_rho=float(target_rho), translator=trans, orig_df=row_df
+            )
+        else:
+            row_trans = row_df.copy()
+
+        # 2. Matriz de características
         X_row, _ = _prepare_stuff_features(
-            row_df,
+            row_trans,
             self.feature_cols,
             cat_categories=self.cat_categories_,
             feature_medians=self.feature_medians_,
         )
 
-        contrib = self.booster_.predict(X_row, pred_contrib=True)[0]
-        base_val_raw = float(contrib[-1])
-        feat_contribs_raw = contrib[:-1]
-
+        n_features = len(self.feature_cols)
         scale = 10.0 / self.sigma_neutral_
-        base_value_plus = float(100.0 + scale * (base_val_raw - self.mu_neutral_))
-        shap_values_plus = {
-            feat: float(scale * c) for feat, c in zip(self.feature_cols, feat_contribs_raw)
+
+        # 3. Score combinado de calidad en target_rho
+        stuff_val = float(self._predict_stuff_value(row_trans)[0])
+        predicted_stuff_plus = float(100.0 + scale * (stuff_val - self.mu_neutral_))
+
+        # 4. Coeficientes del combinador meta_ridge_ para cada target
+        # En M: ["target_whiff", "target_chase", "target_called_strike", "target_groundball",
+        #        "target_weak_contact", "-target_hard_contact", "target_out_on_pitch", "xrv_pitcher"]
+        coef = self.meta_ridge_.coef_
+        target_weights = {
+            "target_whiff": float(coef[0]),
+            "target_chase": float(coef[1]),
+            "target_called_strike": float(coef[2]),
+            "target_groundball": float(coef[3]),
+            "target_weak_contact": float(coef[4]),
+            "target_hard_contact": -float(coef[5]),  # Signo invertido por -hard_contact en M
+            "target_out_on_pitch": float(coef[6]),
+            "xrv_pitcher": float(coef[7]),
         }
 
-        # Ordenar features por contribución en Stuff+
+        # 5. Descomposición aditiva exacta por submodelo
+        sub_bases: list[float] = []
+        sub_contribs: list[np.ndarray] = []
+
+        direct_xrv_base_val = 0.0
+        direct_xrv_feat_c = np.zeros(n_features, dtype=np.float64)
+
+        for tgt in TARGET_COLS:
+            w_tgt = target_weights[tgt]
+
+            if tgt == "xrv_pitcher":
+                reg_xrv = self.submodels_["xrv_pitcher"]
+                contrib_raw = reg_xrv.booster_.predict(X_row, pred_contrib=True)[0]
+                feat_c = contrib_raw[:-1].astype(np.float64)
+                base_c = float(contrib_raw[-1])
+
+                direct_xrv_base_val = base_c
+                direct_xrv_feat_c = feat_c
+
+                sub_bases.append(w_tgt * base_c)
+                sub_contribs.append(w_tgt * feat_c)
+            else:
+                sub = self.submodels_[tgt]
+                if isinstance(sub, tuple) and sub[0] == "constant":
+                    const_p = float(sub[1])
+                    sub_bases.append(w_tgt * const_p)
+                    sub_contribs.append(np.zeros(n_features, dtype=np.float64))
+                else:
+                    raw_contrib = sub.booster_.predict(X_row, pred_contrib=True)[0]
+                    raw_feat_c = raw_contrib[:-1].astype(np.float64)
+                    b_k = float(raw_contrib[-1])
+                    z_k = float(np.sum(raw_feat_c) + b_k)
+
+                    p_k = float(1.0 / (1.0 + np.exp(-z_k)))
+                    p_k0 = float(1.0 / (1.0 + np.exp(-b_k)))
+
+                    diff_z = z_k - b_k
+                    if abs(diff_z) < 1e-12:
+                        alpha_k = 0.0
+                    else:
+                        alpha_k = (p_k - p_k0) / diff_z
+
+                    prob_feat_c = alpha_k * raw_feat_c
+                    sub_bases.append(w_tgt * p_k0)
+                    sub_contribs.append(w_tgt * prob_feat_c)
+
+        # 6. Agregación en escala combinada stuff_value
+        stuff_val_base = float(self.meta_ridge_.intercept_) + float(sum(sub_bases))
+        stuff_val_feat_contrib = np.sum(sub_contribs, axis=0)
+
+        # 7. Conversión exacta a la escala Stuff+
+        base_value_plus = float(100.0 + scale * (stuff_val_base - self.mu_neutral_))
+        shap_values_plus = {
+            feat: float(scale * c) for feat, c in zip(self.feature_cols, stuff_val_feat_contrib)
+        }
+
+        # 8. Rankings de features por contribución
         sorted_desc = sorted(shap_values_plus.items(), key=lambda x: x[1], reverse=True)
         top_pos = [(f, float(v)) for f, v in sorted_desc if v > 0]
         if not top_pos:
@@ -800,13 +890,19 @@ class StuffPlusModel:
         if not top_neg:
             top_neg = [(f, float(v)) for f, v in sorted_asc[:3]]
 
+        direct_xrv_dict = {
+            feat: float(c) for feat, c in zip(self.feature_cols, direct_xrv_feat_c)
+        }
+
         return {
             "base_value": base_value_plus,
             "shap_values": shap_values_plus,
             "top_positive_features": top_pos,
             "top_negative_features": top_neg,
-            "raw_base_value": base_val_raw,
-            "raw_shap_values": {
-                feat: float(c) for feat, c in zip(self.feature_cols, feat_contribs_raw)
-            },
+            "predicted_stuff_plus": predicted_stuff_plus,
+            "stuff_value": stuff_val,
+            "direct_xrv_base_value": direct_xrv_base_val,
+            "direct_xrv_shap_values": direct_xrv_dict,
+            "raw_base_value": direct_xrv_base_val,
+            "raw_shap_values": direct_xrv_dict,
         }

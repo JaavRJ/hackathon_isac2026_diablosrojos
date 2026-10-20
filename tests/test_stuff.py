@@ -198,9 +198,8 @@ def test_stuff_model_neutral_scale_calibration(
     assert hasattr(model, "sigma_neutral_")
     assert model.sigma_neutral_ > 1e-6
 
-    # Evaluar en el conjunto de referencia del canal Stuff (No Altitude)
-    ref_df = train_df[train_df["altitude_category"] == "No Altitude"]
-    scores_df = model.predict_scores(ref_df)
+    # Evaluar en el conjunto de referencia LMB completo (train_df: year <= 2025, todas las altitudes)
+    scores_df = model.predict_scores(train_df)
 
     mean_neutral = float(scores_df["stuff_plus_neutral"].mean())
     std_neutral = float(scores_df["stuff_plus_neutral"].std(ddof=0))
@@ -332,6 +331,49 @@ def test_stuff_model_explain_pitch_shap(
     series_explanation = model.explain_pitch(test_df.iloc[0])
     assert isinstance(series_explanation["base_value"], float)
     assert isinstance(series_explanation["shap_values"], dict)
+
+
+def test_explain_pitch_exact_additivity_with_stuff_plus(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """
+    Verifica que explain_pitch satisface con exactitud matemática la propiedad de aditividad:
+    base_value + sum(shap_values.values()) == predicted_stuff_plus
+    tanto para sabor neutral (stuff_plus_neutral) como para sabor CDMX (stuff_plus_cdmx),
+    y que incluye las contribuciones de direct_xrv_shap_values.
+    """
+    train_df, test_df = processed_lmb_dataset
+    model = StuffPlusModel().fit(train_df)
+
+    test_indices = [0, 4, 11, 23]
+    for idx in test_indices:
+        single_row = test_df.iloc[[idx]].copy()
+
+        # 1. Verificación en sabor neutral (target_rho = 1.0)
+        exp_neutral = model.explain_pitch(single_row, target_rho=1.0)
+        score_neutral = float(model.predict_scores(single_row)["stuff_plus_neutral"].iloc[0])
+
+        sum_shap_neutral = sum(exp_neutral["shap_values"].values())
+        reconstructed_neutral = exp_neutral["base_value"] + sum_shap_neutral
+
+        assert reconstructed_neutral == pytest.approx(score_neutral, abs=1e-6)
+        assert exp_neutral["predicted_stuff_plus"] == pytest.approx(score_neutral, abs=1e-6)
+
+        # 2. Verificación en sabor CDMX (target_rho = model.rho_extreme_median_)
+        rho_cdmx = float(model.rho_extreme_median_)
+        exp_cdmx = model.explain_pitch(single_row, target_rho=rho_cdmx)
+        score_cdmx = float(model.predict_scores(single_row, rho_cdmx=rho_cdmx)["stuff_plus_cdmx"].iloc[0])
+
+        sum_shap_cdmx = sum(exp_cdmx["shap_values"].values())
+        reconstructed_cdmx = exp_cdmx["base_value"] + sum_shap_cdmx
+
+        assert reconstructed_cdmx == pytest.approx(score_cdmx, abs=1e-6)
+        assert exp_cdmx["predicted_stuff_plus"] == pytest.approx(score_cdmx, abs=1e-6)
+
+        # 3. Comprobar existencia de atribuciones directas de xrv
+        assert "direct_xrv_base_value" in exp_neutral
+        assert "direct_xrv_shap_values" in exp_neutral
+        assert len(exp_neutral["direct_xrv_shap_values"]) == len(STUFF_FEATURES)
 
 
 # ==============================================================================
