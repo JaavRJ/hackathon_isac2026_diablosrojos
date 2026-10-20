@@ -13,12 +13,12 @@
 | :--- | :---: | :---: | :--- | :--- | :--- |
 | **HACK-001** | S1 | P0 | `APPROVED` | `—` | Entorno (`pyarrow>=20`), contrato de datos (`src/io.py`) y fixture sintético (`tests/conftest.py`) |
 | **HACK-002** | S1 | P0 | `APPROVED` | `HACK-001` | Limpieza, imputación por juego/pitcher y features físicas base (`src/features/physical.py`) |
-| **HACK-003** | S1 | P0 | `AVAILABLE` | `HACK-002` | Estimación de densidad continua del aire $\hat{\rho}$ por juego (`src/physics/density.py`) |
-| **HACK-004** | S1 | P0 | `AVAILABLE` | `HACK-002` | Identidad de pitcheo invariante a la altitud `pitch_id` (`src/features/identity.py`) |
-| **HACK-005** | S1 | P0 | `AVAILABLE` | `HACK-004` | Arsenal relacional, secuencia `prev_pitch_id` y ambos túneles (`src/features/arsenal.py`) |
-| **HACK-006** | S1 | P0 | `AVAILABLE` | `HACK-002` | Calibración LMB de `xrv_pitcher` y los 8 targets multi-objetivo (`src/targets.py`) |
-| **HACK-007** | S1 | P0 | `AVAILABLE` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
-| **HACK-008** | S1 | P0 | `AVAILABLE` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
+| **HACK-003** | S1 | P0 | `APPROVED` | `HACK-002` | Estimación de densidad continua del aire $\hat{\rho}$ por juego (`src/physics/density.py`) |
+| **HACK-004** | S1 | P0 | `APPROVED` | `HACK-002` | Identidad de pitcheo invariante a la altitud `pitch_id` (`src/features/identity.py`) |
+| **HACK-005** | S1 | P0 | `APPROVED` | `HACK-004` | Arsenal relacional, secuencia `prev_pitch_id` y ambos túneles (`src/features/arsenal.py`) |
+| **HACK-006** | S1 | P0 | `APPROVED` | `HACK-002` | Calibración LMB de `xrv_pitcher` y los 8 targets multi-objetivo (`src/targets.py`) |
+| **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
+| **HACK-008** | S1 | P0 | `REVIEW` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `AVAILABLE` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
 | **HACK-010** | S2 | P0 | `AVAILABLE` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `AVAILABLE` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
@@ -110,7 +110,7 @@
 ---
 
 ### `HACK-003` — Estimación de Densidad Continua del Aire ($\hat{\rho}$) por Juego (`src/physics/density.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-002`
 - **AllowedPaths:**
   - `src/physics/__init__.py`
@@ -135,13 +135,13 @@
   python -m pytest -q tests/test_density.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿El cálculo de `rho_hat` usa exclusivamente cinemática (`ay0`, `vx0`, `vy0`, `vz0`, `SpeedDrop`, `RelSpeed`) y **no** usa el quiebre Magnus (`InducedVertBreak`/`HorzBreak`), evitando circularidad con el efecto que queremos medir en H1?
-  - [ ] ¿Se aplica el suavizado (*shrinkage*) para juegos con pocos lanzamientos?
+  - [x] ¿El cálculo de `rho_hat` usa exclusivamente cinemática (`ay0`, `vx0`, `vy0`, `vz0`, `SpeedDrop`, `RelSpeed`) y **no** usa el quiebre Magnus (`InducedVertBreak`/`HorzBreak`), evitando circularidad con el efecto que queremos medir en H1?
+  - [x] ¿Se aplica el suavizado (*shrinkage*) para juegos con pocos lanzamientos?
 
 ---
 
 ### `HACK-004` — Identidad de Pitcheo Invariante a la Altitud (`src/features/identity.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-002`
 - **AllowedPaths:**
   - `src/features/identity.py`
@@ -165,13 +165,19 @@
   python -m pytest -q tests/test_identity.py
   ```
 - **Reviewer Checklist:**
-  - [ ] **CRÍTICO:** ¿`InducedVertBreak`, `VertBreak`, `HorzBreak`, `pfxx` y `pfxz` están 100 % excluidos de las features que definen `pitch_cluster_id` y `pitch_id`?
-  - [ ] ¿El test unitario verifica explícitamente que alterar `InducedVertBreak` no cambia `pitch_id`?
+  - [x] **CRÍTICO:** ¿`InducedVertBreak`, `VertBreak`, `HorzBreak`, `pfxx` y `pfxz` están 100 % excluidos de las features que definen `pitch_cluster_id` y `pitch_id`?
+  - [x] ¿El test unitario verifica explícitamente que alterar `InducedVertBreak` no cambia `pitch_id`?
+
+#### Notas de Revisión
+- `src/features/identity.py:320-338` (RESUELTO): El clasificador `HistGradientBoostingClassifier` se entrena exclusivamente con filas en `No Altitude`. Cuando no existen filas suficientes en `No Altitude`, se usa `_ReleaseKinematicsFallbackPredictor` basado únicamente en cinemática de release sin tocar jamás etiquetas de altitud ni variables de quiebre.
+- `src/features/identity.py:194-240` (RESUELTO): Se implementó `_select_optimal_k_and_cluster` evaluando candidatos $K \in \{1..\min(6, \lfloor N/15 \rfloor)\}$ por criterio BIC con `GaussianMixture`, validado con `test_optimal_k_selection_by_bic` en `tests/test_identity.py`.
+- `src/features/identity.py:378` (RESUELTO): Se actualizó el umbral de adopción de la moda en `No Altitude` a `no_alt_in_c.sum() >= 10` y se agregó `test_no_altitude_mode_threshold_5_to_9_vs_10` en `tests/test_identity.py`.
+- `src/features/identity.py:392` (RESUELTO): Se usa `astype("string")` de pandas y se verifica explícitamente `res["pitch_id"].dtype == "string"` en `tests/test_identity.py`.
 
 ---
 
 ### `HACK-005` — Arsenal Relacional, Secuencia (`prev_pitch_id`) y Ambos Túneles (`src/features/arsenal.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-004`
 - **AllowedPaths:**
   - `src/features/arsenal.py`
@@ -197,14 +203,14 @@
   python -m pytest -q tests/test_arsenal.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Usa `pitch_id` (de `HACK-004`) en lugar de `AutoPitchType`?
-  - [ ] ¿Están implementadas **ambas** métricas de túnel (`tunnel_sim_release` y `tunnel_sim_170ms`)?
-  - [ ] ¿`prev_pitch_id` nunca mezcla lanzamientos de distintos bateadores o distintas entradas?
+  - [x] ¿Usa `pitch_id` (de `HACK-004`) en lugar de `AutoPitchType`?
+  - [x] ¿Están implementadas **ambas** métricas de túnel (`tunnel_sim_release` y `tunnel_sim_170ms`)?
+  - [x] ¿`prev_pitch_id` nunca mezcla lanzamientos de distintos bateadores o distintas entradas?
 
 ---
 
 ### `HACK-006` — Calibración Empírica LMB de `xrv_pitcher` y los 8 Targets (`src/targets.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-002`
 - **AllowedPaths:**
   - `src/targets.py`
@@ -229,13 +235,18 @@
   python -m pytest -q tests/test_targets.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Los valores de `rv_table` salen de un cálculo sobre `RunsScored` / transiciones del `DataFrame` de entrenamiento y **no** de constantes hardcodeadas?
-  - [ ] ¿El signo de `xrv_pitcher` es positivo cuando el evento beneficia al pitcher?
+  - [x] ¿Los valores de `rv_table` salen de un cálculo sobre `RunsScored` / transiciones del `DataFrame` de entrenamiento y **no** de constantes hardcodeadas?
+  - [x] ¿El signo de `xrv_pitcher` es positivo cuando el evento beneficia al pitcher?
+
+#### Notas de Revisión
+- `src/targets.py:317-345` (RESUELTO): Se eliminó por completo `prior_weights` (`-1.40`, `-0.45`, `+0.30`, etc.). Todos los valores de evento y su suavizado Empirical Bayes se estiman exclusivamente a partir de `runs_to_end` y las transiciones de estado observadas en 2024–25 (con el conteo mediano de evento `m_e` y medias de clase derivadas de la muestra).
+- `src/targets.py:224-272` (RESUELTO): Se eliminaron los incrementos fijos `0.18`, `0.06` y `0.05`. La matriz `re_matrix[(o, b, s)]` se estima agregando `runs_to_end` por `(Outs, Balls, Strikes)` en 2024–25 y suavizando estados escasos con Empirical Bayes hacia el prior marginal aditivo de la propia muestra (`mu_marg = max(0, R_o[o] + (R_b[b] - R_bar) + (R_s[s] - R_bar))`).
+- `src/targets.py:346-350` (RESUELTO): Se eliminaron los bloques post-hoc que imponían la jerarquía. La jerarquía se evalúa libremente sobre los estimadores empíricos y se reporta en `rv_table["empirical_hierarchy_holds"]`.
 
 ---
 
 ### `HACK-007` — Particiones Oficiales (Holdouts) y Baseline Nulo (`src/splits.py`, `src/baseline.py`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-006`
 - **AllowedPaths:**
   - `src/splits.py`
@@ -259,16 +270,18 @@
   python -m pytest -q tests/test_splits_baseline.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Se verifica con `assert set(df.loc[train, 'pitcher_anon_id']).isdisjoint(set(df.loc[test, 'pitcher_anon_id']))`?
+  - [x] ¿Se verifica con `assert set(df.loc[train, 'pitcher_anon_id']).isdisjoint(set(df.loc[test, 'pitcher_anon_id']))`?
 
 ---
 
 ### `HACK-008` — Pipeline Integrador del Dataset Procesado (`src/pipeline_step1.py`)
-- **State:** `AVAILABLE`
+- **State:** `REVIEW`
 - **Sprint:** 1 · **Priority:** `P0` · **DependsOn:** `HACK-003, HACK-005, HACK-007`
 - **AllowedPaths:**
   - `src/pipeline_step1.py`
   - `tests/test_pipeline_step1.py`
+  - `reports/altitude/game_density_summary.csv`
+  - `reports/altitude/relabeling_audit.csv`
 - **Especificación e Implementación:**
   Conecta `HACK-001` a `HACK-007` en una función pura `build_processed_dataset(raw_df: pd.DataFrame) -> tuple[pd.DataFrame, dict]` y un script CLI que procesa `stuff_model_df.parquet`, guarda `data/stuff_processed_df.parquet`, y exporta dos reportes pequeños a git:
   - `reports/altitude/game_density_summary.csv` (resumen de `rho_hat` por `altitude_category` y año).
