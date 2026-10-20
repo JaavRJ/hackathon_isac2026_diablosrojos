@@ -22,8 +22,8 @@
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
 | **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
-| **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
-| **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
+| **HACK-012** | S2 | P0 | `IN_PROGRESS` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
+| **HACK-013** | S2 | P0 | `IN_PROGRESS` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
 | **HACK-014** | S2 | P0 | `AVAILABLE` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `AVAILABLE` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `AVAILABLE` | `HACK-014` | Motor **AI Pitch Sculptor** con restricción de factibilidad + pestaña UI (`src/sculptor/optimizer.py`) |
@@ -414,7 +414,7 @@
 ---
 
 ### `HACK-012` — Suite de Validación en los 3 Holdouts vs Baseline Nulo (`analysis/run_validation.py`)
-- **State:** `AVAILABLE`
+- **State:** `IN_PROGRESS`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/__init__.py`
@@ -445,7 +445,7 @@
 ---
 
 ### `HACK-013` — Descomposición Canal Stuff vs. Canal Parque y Pruebas H1–H4 (`analysis/run_hypotheses.py`)
-- **State:** `AVAILABLE`
+- **State:** `IN_PROGRESS`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/run_hypotheses.py`
