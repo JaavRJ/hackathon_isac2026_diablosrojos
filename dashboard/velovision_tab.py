@@ -100,16 +100,38 @@ def _probe(path: str) -> tuple[float, int]:
         return 30.0, 0
 
 
-def get_sequence(data: bytes, digest: str) -> PS.PoseSequence | None:
+def video_seconds(data: bytes, digest: str) -> float | None:
+    """Duración del video en segundos (None si no se pudo leer). Se calcula una vez por video y sesión."""
+    cache: dict = st.session_state.setdefault("vv_duration_cache", {})
+    if digest in cache:
+        return cache[digest]
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as fh:
+            fh.write(data)
+            tmp = fh.name
+        fps, total = _probe(tmp)
+        dur = (total / fps) if total > 0 else None
+    except Exception:
+        dur = None
+    finally:
+        if tmp and os.path.exists(tmp):
+            os.unlink(tmp)
+    cache[digest] = dur
+    return dur
+
+
+def get_sequence(data: bytes, digest: str, start_seconds: float = 0.0) -> PS.PoseSequence | None:
     """Pose por frame del video, con caché por hash en la SESIÓN (no global).
 
     Muestra una barra de progreso (estimada por tiempo: el extractor no reporta avance) y los errores como
     mensajes claros. Devuelve ``None`` si no se pudo procesar. El temporal se borra siempre.
     """
     cache: OrderedDict = st.session_state.setdefault("vv_seq_cache", OrderedDict())
-    if digest in cache:
-        cache.move_to_end(digest)
-        return cache[digest]
+    ckey = f"{float(start_seconds):g}@{digest}"          # el segundo de inicio forma parte de la clave
+    if ckey in cache:
+        cache.move_to_end(ckey)
+        return cache[ckey]
 
     bar = st.progress(0.0, text="Preparando el video…")
     tmp = None
@@ -122,7 +144,8 @@ def get_sequence(data: bytes, digest: str) -> PS.PoseSequence | None:
         expected = max(1, min(total or int(seconds * fps), int(seconds * fps)))
         t0 = time.perf_counter()
         with ThreadPoolExecutor(max_workers=1) as pool:
-            fut = pool.submit(PS.extract_pose_sequence, tmp, seconds, TARGET_WIDTH)
+            kw = {"start_seconds": float(start_seconds)} if start_seconds else {}
+            fut = pool.submit(PS.extract_pose_sequence, tmp, seconds, TARGET_WIDTH, **kw)
             while not fut.done():
                 est = min(0.95, (time.perf_counter() - t0) / (expected * 0.05))   # ~50 ms/frame, solo estimación
                 bar.progress(est, text=f"Detectando la pose en ~{expected} frames (avance estimado)…")
@@ -145,7 +168,7 @@ def get_sequence(data: bytes, digest: str) -> PS.PoseSequence | None:
             os.unlink(tmp)
     time.sleep(0.15)
     bar.empty()
-    cache[digest] = seq
+    cache[ckey] = seq
     while len(cache) > SEQ_CACHE_SIZE:
         cache.popitem(last=False)
     return seq
@@ -172,7 +195,19 @@ def confirmed_frame(digest: str, throws: str) -> int | None:
     return int(c["frame"]) if c and c["digest"] == digest and c["throws"] == throws else None
 
 
-def _send_to_sculptor(params: dict) -> None:
+def video_tolerances(m: dict, slot_err: float | None) -> dict:
+    """Tolerancias del Sculptor ampliadas por el error del video: altura +-max(0.35, error sistemático de la
+    altura) y slot +-max(6, error del slot). La velocidad conserva su tolerancia estándar."""
+    from src.sculptor.optimizer import ARM_SLOT_TOL_DEG, FB_VELO_TOL_MPH, REL_HEIGHT_TOL_FT
+    h_err = m.get("rel_height_sys_err_ft")
+    return {
+        "arm_slot_deg": max(ARM_SLOT_TOL_DEG, float(slot_err) if slot_err is not None else 0.0),
+        "RelHeight": max(REL_HEIGHT_TOL_FT, float(h_err) if h_err is not None else 0.0),
+        "fb_velo": FB_VELO_TOL_MPH,
+    }
+
+
+def _send_to_sculptor(params: dict, tolerances: dict | None = None) -> None:
     """Carga la mecánica medida como pitcheo activo del Sculptor (``active_pitch_params``).
 
     Guarda también la base (parámetros del Simulador al hacer clic) para que ``apply_velovision_override``
@@ -181,8 +216,15 @@ def _send_to_sculptor(params: dict) -> None:
     base = dict(st.session_state.get("active_pitch_params") or {})
     new = {**base, **params}
     st.session_state["vv_override"] = {"base": base, "params": new}
+    st.session_state["vv_tolerances"] = dict(tolerances) if tolerances else None
     st.session_state["active_pitch_params"] = new
     st.session_state["vv_sent"] = True
+
+
+def _send_and_jump(params: dict, tolerances: dict | None = None) -> None:
+    """Carga la mecánica en el Sculptor y pide saltar a esa pestaña (con aviso visible aunque el salto falle)."""
+    _send_to_sculptor(params, tolerances)
+    C.request_tab_jump("Sculptor", "VeloVision", "Parámetros cargados en Sculptor")
 
 
 def apply_velovision_override() -> None:
@@ -197,6 +239,7 @@ def apply_velovision_override() -> None:
         return
     if (st.session_state.get("active_pitch_params") or {}) != ov["base"]:
         st.session_state["vv_override"] = None
+        st.session_state["vv_tolerances"] = None
         st.session_state["vv_sent"] = False
         return
     st.session_state["active_pitch_params"] = dict(ov["params"])
@@ -208,6 +251,11 @@ def apply_velovision_override() -> None:
 @st.cache_data(show_spinner=False, max_entries=64)
 def _card(slot: float, throws: str, err: float | None, velo: float | None, kind: str | None = None) -> dict:
     return PC.build_prospect_card(slot, throws, slot_error_deg=err, observed_velo_mph=velo, slot_error_kind=kind)
+
+
+@st.cache_data(show_spinner=False, max_entries=32)
+def _plausibility(h, side, slot, throws: str, errs: tuple) -> dict:
+    return PC.plausibility_report(h, side, slot, throws, dict(errs))
 
 
 @st.cache_data(show_spinner=False)
@@ -269,6 +317,20 @@ def _inputs() -> dict:
     return {"clip": clip, "throws": HAND_LABELS[hand], "height_ft": float(h_ft), "velo": velo}
 
 
+def _start_control(digest: str, total: float | None) -> float:
+    """Slider "Segundo de inicio" (0 a duración - 1 s). Mover el tramo suelta la confirmación de soltura."""
+    if not total or total < 2.0:
+        return 0.0
+    return float(st.slider("Segundo de inicio", 0.0, float(int(total - 1.0)), 0.0, 0.5, key=f"vv_start_{digest[:10]}",
+                           on_change=_unconfirm,
+                           help=f"Solo se analizan {MAX_SECONDS:.0f} s a la vez. Si la soltura queda fuera del tramo, "
+                                "mueve el inicio."))
+
+
+NO_RELEASE_MSG = ("No se detectó una soltura clara en este tramo; probablemente es la preparación. "
+                  "Mueve el segundo de inicio o elige el frame a mano.")
+
+
 def _frame_picker(seq: PS.PoseSequence, digest: str, throws: str) -> tuple[int, dict]:
     """Barra de frames con el release sugerido y sus candidatos; devuelve (frame elegido, detección)."""
     det = PS.detect_release_frame(seq, throws)
@@ -287,7 +349,7 @@ def _frame_picker(seq: PS.PoseSequence, digest: str, throws: str) -> tuple[int, 
 
 def _measure_cards(m: dict) -> str:
     ok = bool(m["quality_ok"])
-    tag = "" if ok else "calidad insuficiente"
+    tag = "" if ok else ("bloqueado" if m.get("blocking_issues") else "calidad insuficiente")
     c1 = C.measure_card("up", "Altura de soltura", m["rel_height_ft"], "ft",
                         _err_text(m.get("rel_height_sys_err_ft"), "ft", 2), tag, 2)
     c2 = C.measure_card("right", "Lado de soltura", m["rel_side_ft"], "ft",
@@ -299,7 +361,28 @@ def _measure_cards(m: dict) -> str:
     return f'<div class="dr-mini2" style="grid-template-columns:repeat(2,1fr);gap:.7rem">{c1}{c2}{c3}{c4}</div>'
 
 
-def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_ft: float) -> None:
+def _plausibility_for(m: dict, throws: str) -> dict:
+    errs = (("rel_height_ft", m.get("rel_height_sys_err_ft")), ("rel_side_ft", m.get("rel_side_sys_err_ft")),
+            ("arm_slot_dataset_deg", m.get("slot_sys_err_deg")))
+    return _plausibility(m.get("rel_height_ft"), m.get("rel_side_ft"), m.get("arm_slot_dataset_deg"), throws, errs)
+
+
+def _render_plausibility(plaus: dict) -> None:
+    """Dónde cae cada medida frente a la LMB. Informa; no bloquea la ficha."""
+    rows = []
+    for key in ("rel_height_ft", "rel_side_ft", "arm_slot_dataset_deg"):
+        r = plaus[key]
+        lead = {"dentro": "Dentro. ", "fuera": "Fuera. ", "sin referencia": "Sin referencia. "}[r["status"]]
+        rows.append(f'<div class="note"><b>{lead}</b>{C.esc(r["text"].rstrip("."))}.</div>')
+    st.markdown(f'<div class="dr-h4" style="font-size:.95rem;margin-top:.5rem">{C.icon("gauge")}'
+                'Plausibilidad frente a la LMB</div>' + "".join(rows), unsafe_allow_html=True)
+    if plaus["any_outside"]:
+        st.markdown(C.callout("Alguna medida cae fuera del rango de la LMB. La ficha se muestra igual, pero para "
+                              "llevarla al Sculptor tendrás que confirmarlo."), unsafe_allow_html=True)
+
+
+def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_ft: float,
+                  plaus: dict | None = None) -> None:
     slot = float(m["arm_slot_dataset_deg"])
     err, kind = slot_error_for(m)
     card = _card(slot, throws, err, velo, kind)
@@ -341,6 +424,7 @@ def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_
     else:
         notes.append("El error de medición aún no se midió: se usa la ventana mínima de ±6°.")
     st.markdown("".join(f'<div class="note">{C.esc(n)}</div>' for n in notes), unsafe_allow_html=True)
+    st.markdown(f'<div class="note">{C.esc(PC.REFERENCE_NOTE)}</div>', unsafe_allow_html=True)
     st.markdown(C.disclaimer_badge(card["disclaimer"]), unsafe_allow_html=True)
 
     if velo is not None:
@@ -350,10 +434,11 @@ def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_
         st.markdown('<div class="note">Se reporta el ancho p25–p75 sin y con la lectura de radar; el radar no '
                     'siempre lo reduce.</div>', unsafe_allow_html=True)
 
-    _render_sculptor_button(m, throws, velo, digest, slot)
+    _render_sculptor_button(m, throws, velo, digest, slot, err, plaus)
 
 
-def _render_sculptor_button(m: dict, throws: str, velo: float | None, digest: str, slot: float) -> None:
+def _render_sculptor_button(m: dict, throws: str, velo: float | None, digest: str, slot: float,
+                            slot_err: float | None = None, plaus: dict | None = None) -> None:
     st.markdown(f'<div class="dr-h4" style="margin-top:.8rem">{C.icon("target")}Llevar esta mecánica al Sculptor</div>',
                 unsafe_allow_html=True)
     h_default = m.get("rel_height_ft")
@@ -363,12 +448,21 @@ def _render_sculptor_button(m: dict, throws: str, velo: float | None, digest: st
                         help="El Sculptor la necesita; se llena con la altura medida y puedes corregirla.")
     v = c2.number_input("Velocidad de la recta (mph)", 60.0, 105.0, velo, 0.5, key=f"vv_sc_v_{digest[:8]}_{velo}",
                         help="El Sculptor la necesita; ingresa la del radar.")
-    ready = h is not None and v is not None
+    outside = bool(plaus and plaus.get("any_outside"))
+    confirmed_outside = True
+    if outside:
+        confirmed_outside = st.checkbox("Entiendo que la medida está fuera del rango de la LMB",
+                                        key=f"vv_ack_outside_{digest[:8]}",
+                                        help="Sin esta confirmación no se envía al Sculptor.")
+    ready = h is not None and v is not None and confirmed_outside
     params = {"PitcherThrows": throws, "arm_slot_deg": float(min(90.0, max(0.0, slot))),
               "RelHeight": float(h) if h is not None else None, "fb_velo": float(v) if v is not None else None}
     c3.button("Buscar referencias factibles", key="vv_to_sculptor", type="primary", width="stretch",
-              disabled=not ready, on_click=_send_to_sculptor, args=(params,))
-    if not ready:
+              disabled=not ready, on_click=_send_and_jump, args=(params, video_tolerances(m, slot_err)))
+    if outside and not confirmed_outside:
+        st.markdown('<div class="note">Marca la confirmación de arriba para poder enviar una medida fuera del rango '
+                    'de la LMB al Sculptor.</div>', unsafe_allow_html=True)
+    elif h is None or v is None:
         st.markdown('<div class="note">Falta la altura o la velocidad de la recta: ingrésalas para continuar '
                     '(el Sculptor no acepta valores vacíos).</div>', unsafe_allow_html=True)
     elif st.session_state.get("vv_sent"):
@@ -377,12 +471,18 @@ def _render_sculptor_button(m: dict, throws: str, velo: float | None, digest: st
 
 
 def _render_quality_gate(m: dict) -> None:
-    st.markdown(C.callout(
-        f"Calidad {m['quality_score']:.2f} (mínimo {PS.QUALITY_MIN:.2f}): no se generan rangos con este video."),
-        unsafe_allow_html=True)
+    blocking = list(m.get("blocking_issues") or [])
+    if blocking and m["quality_score"] >= PS.QUALITY_MIN:
+        head = (f"Calidad {m['quality_score']:.2f} (mínimo {PS.QUALITY_MIN:.2f}), pero hay motivos que bloquean "
+                "la ficha aunque el puntaje pase: no se generan rangos con este video.")
+    else:
+        head = f"Calidad {m['quality_score']:.2f} (mínimo {PS.QUALITY_MIN:.2f}): no se generan rangos con este video."
+    st.markdown(C.callout(head), unsafe_allow_html=True)
+    for issue in blocking:
+        st.markdown(C.callout("Bloquea: " + issue), unsafe_allow_html=True)
     for issue in m["quality_issues"]:
         st.markdown(C.callout(issue), unsafe_allow_html=True)
-    if not m["quality_issues"]:
+    if not m["quality_issues"] and not blocking:
         st.markdown(C.callout("Regraba siguiendo la guía de captura o elige otro frame de soltura."),
                     unsafe_allow_html=True)
 
@@ -407,11 +507,17 @@ def render_velovision_tab() -> None:
             "demostración si tienes alguno en la carpeta local."), unsafe_allow_html=True)
         return
 
-    data, digest = inp["clip"]
+    data, raw_digest = inp["clip"]
     throws, height_ft, velo = inp["throws"], inp["height_ft"], inp["velo"]
-    seq = get_sequence(data, digest)
+    total = video_seconds(data, raw_digest)
+    start = _start_control(raw_digest, total)
+    seq = get_sequence(data, raw_digest, start)
     if seq is None:
         return
+    digest = f"{start:g}@{raw_digest}"          # confirmaciones y frames dependen también del tramo analizado
+    shown = seq.n_frames / seq.fps if seq.fps else 0.0
+    st.markdown(f'<div class="note">Se analizan {shown:.1f} s (de {start:.1f} a {start + shown:.1f}) de un video de '
+                + (f'{total:.1f} s' if total else 'duración desconocida') + '.</div>', unsafe_allow_html=True)
 
     st.markdown(f'<div class="dr-h4" style="margin-top:.6rem">{C.icon("frames")}Elige el frame de soltura</div>',
                 unsafe_allow_html=True)
@@ -430,6 +536,11 @@ def render_velovision_tab() -> None:
                         on_click=_confirm, args=(digest, throws, sel))
         st.markdown(f'<div class="note">Sugerido por el sistema: frame {det["frame_idx"]} '
                     f'(confianza {det["confidence"]:.2f}). Mueve la barra para elegir otro.</div>', unsafe_allow_html=True)
+        release_ack = True
+        if not det.get("valid", True):
+            st.markdown(C.callout(NO_RELEASE_MSG), unsafe_allow_html=True)
+            release_ack = st.checkbox("Entiendo que no se detectó una soltura clara y elijo este frame bajo mi responsabilidad",
+                                      key=f"vv_ack_release_{digest[:12]}")
     with col_meas:
         st.markdown(_measure_cards(m), unsafe_allow_html=True)
         origin = m.get("origin_notes")
@@ -439,7 +550,12 @@ def render_velovision_tab() -> None:
         st.markdown('<div class="note">Altura y lado son aproximaciones en 2D con origen distinto al de los datos '
                     'de la liga (TrackMan); por eso se reportan con su error.</div>', unsafe_allow_html=True)
 
-    gate_ok = bool(m["quality_ok"]) and m["quality_score"] >= PS.QUALITY_MIN and m["arm_slot_dataset_deg"] is not None
+    gate_ok = (bool(m["quality_ok"]) and not m.get("blocking_issues") and m["quality_score"] >= PS.QUALITY_MIN
+               and m["arm_slot_dataset_deg"] is not None)
+    plaus = _plausibility_for(m, throws) if gate_ok and m.get("rel_height_ft") is not None else None
+    if plaus is not None:
+        with col_meas:
+            _render_plausibility(plaus)
     if not gate_ok:
         _render_quality_gate(m)
         return
@@ -447,5 +563,9 @@ def render_velovision_tab() -> None:
         st.markdown(C.note_box("Confirma la soltura (botón de arriba) para generar la ficha de prospecto."),
                     unsafe_allow_html=True)
         return
+    if not release_ack:
+        st.markdown(C.note_box("Marca la casilla de arriba (no se detectó una soltura clara) para generar la "
+                               "ficha de prospecto y enviarla al Sculptor."), unsafe_allow_html=True)
+        return
     st.markdown(f'<span class="dr-ok">{C.icon("check")}Soltura confirmada en el frame {sel}</span>', unsafe_allow_html=True)
-    _render_ficha(m, throws, velo, digest, height_ft)
+    _render_ficha(m, throws, velo, digest, height_ft, plaus)

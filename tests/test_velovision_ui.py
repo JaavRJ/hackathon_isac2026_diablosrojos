@@ -81,8 +81,13 @@ def fake_clip(tmp_path, monkeypatch):
     return clips
 
 
-def _inject(monkeypatch, seq):
+def _inject(monkeypatch, seq, valid=True):
+    """Inyecta la pose. Los skeletons sintéticos no son un lanzamiento real, así que por defecto la detección de
+    soltura se da por válida; con ``valid=None`` se usa el detector real (que dirá "sin soltura clara")."""
     monkeypatch.setattr(PS, "extract_pose_sequence", lambda path, max_seconds=6.0, target_width=640, **kw: seq)
+    if valid is not None:
+        real = PS.detect_release_frame
+        monkeypatch.setattr(PS, "detect_release_frame", lambda *a, **k: {**real(*a, **k), "valid": bool(valid)})
 
 
 def _open_clip(at):
@@ -302,3 +307,184 @@ def test_measure_card_always_shows_error_text():
     html = C.measure_card("up", "Altura", 6.1234, "ft", VT.ERR_PENDING, decimals=2)
     assert "6.12" in html and VT.ERR_PENDING in html
     assert "—" in C.measure_card("up", "Altura", None, "ft", VT.ERR_PENDING)
+
+
+
+# ----------------------------------------------------------------------------
+# Ajustes tras la primera prueba con video real
+# ----------------------------------------------------------------------------
+REFERENCE_TEXT = "Referencia de lo que logran pitchers LMB con una mecánica parecida; no es el nivel de este lanzador."
+
+
+def _seq_with(rel_h, rel_s=1.2, n=40):
+    kp = np.stack([_skeleton("R", _wrist(HEIGHT_FT, rel_h, rel_s)) for _ in range(n)])
+    return PS.PoseSequence.from_keypoints(kp, fps=30.0, width=W, height=H)
+
+
+def test_card_shows_literal_reference_text_and_plausibility_inside(fake_clip, monkeypatch):
+    _inject(monkeypatch, _synthetic_seq())
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    at.button(key="vv_confirm").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    txt = _text(at)
+    assert REFERENCE_TEXT in txt and PC.REFERENCE_NOTE == REFERENCE_TEXT
+    assert "Plausibilidad frente a la LMB" in txt and "dentro del rango de la LMB" in txt
+    assert not any("fuera del rango de la LMB" in c.label for c in at.checkbox)
+
+
+def test_outside_range_needs_explicit_confirmation_and_sends_widened_tolerances(fake_clip, monkeypatch):
+    _inject(monkeypatch, _seq_with(7.8))
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    at.button(key="vv_confirm").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    txt = _text(at)
+    assert "por encima de cualquier lanzador LMB" in txt and "revisa la estatura y la cámara" in txt
+    assert "Ficha de prospecto" in txt and REFERENCE_TEXT in txt
+    at.checkbox(key="vv_use_radar").check().run()
+    at.number_input(key="vv_velo").set_value(91.0).run()
+    ack = [c for c in at.checkbox if "fuera del rango de la LMB" in c.label]
+    assert len(ack) == 1 and ack[0].label == "Entiendo que la medida está fuera del rango de la LMB"
+    assert at.button(key="vv_to_sculptor").disabled
+    ack[0].check().run()
+    assert not at.button(key="vv_to_sculptor").disabled
+    at.button(key="vv_to_sculptor").click().run()
+    tol = at.session_state["vv_tolerances"]
+    assert tol["RelHeight"] == pytest.approx(max(0.35, PS.REL_HEIGHT_SYS_ERR_FT))
+    assert tol["arm_slot_deg"] >= 6.0 and tol["fb_velo"] == 2.0
+
+
+def test_blocking_issue_hides_ranges_even_with_passing_score(fake_clip, monkeypatch):
+    kp = np.stack([_skeleton("R", _wrist(HEIGHT_FT, 6.4, 1.2)) for _ in range(40)])
+    kp[:, PS.R_SHOULDER, 0], kp[:, PS.L_SHOULDER, 0] = 0.49, 0.51
+    _inject(monkeypatch, PS.PoseSequence.from_keypoints(kp, fps=30.0, width=W, height=H))
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    txt = _text(at)
+    assert "Bloquea:" in txt and "Vista de perfil" in txt and "aunque el puntaje pase" in txt
+    assert "Ficha de prospecto" not in txt and "dr-fams" not in txt and "Plausibilidad" not in txt
+
+
+def test_sculptor_tab_declares_widened_tolerances():
+    def app():
+        import streamlit as st
+        from dashboard import theme
+        from dashboard.sculptor_tab import render_sculptor_tab
+        theme.begin_run()
+        theme.inject_global_css()
+        st.session_state["active_pitch_params"] = {"PitcherThrows": "Right", "arm_slot_deg": 40.0,
+                                                   "RelHeight": 5.9, "fb_velo": 92.0, "pitch_id": "Four-Seam"}
+        st.session_state["vv_override"] = {"base": {}, "params": {}}
+        st.session_state["vv_tolerances"] = {"arm_slot_deg": 9.0, "RelHeight": 0.4, "fb_velo": 2.0}
+        render_sculptor_tab()
+
+    at = AppTest.from_function(app, default_timeout=60).run()
+    assert not at.exception, [e.value for e in at.exception]
+    txt = _text(at)
+    assert "Tolerancias ampliadas por el error del video" in txt and "±0.40 ft altura" in txt and "±9.0° arm slot" in txt
+
+
+NO_RELEASE = "No se detectó una soltura clara en este tramo; probablemente es la preparación. Mueve el segundo de inicio o elige el frame a mano."
+
+
+def test_no_clear_release_shows_callout_and_requires_checkbox(fake_clip, monkeypatch):
+    kp = np.stack([_skeleton("R", _wrist(HEIGHT_FT, 6.4, 1.2)) for _ in range(40)])      # sin barrido: preparación
+    _inject(monkeypatch, PS.PoseSequence.from_keypoints(kp, fps=30.0, width=W, height=H), valid=None)
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    assert NO_RELEASE in _text(at)
+    at.button(key="vv_confirm").click().run()
+    txt = _text(at)
+    assert "Ficha de prospecto" not in txt and "dr-fams" not in txt           # sin la casilla no hay ficha
+    ack = [c for c in at.checkbox if "no se detectó una soltura clara" in c.label]
+    assert len(ack) == 1
+    ack[0].check().run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert "Ficha de prospecto" in _text(at)
+
+
+def test_valid_release_has_no_callout_or_checkbox(fake_clip, monkeypatch):
+    _inject(monkeypatch, _synthetic_seq())
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    assert NO_RELEASE not in _text(at)
+    assert not [c for c in at.checkbox if "no se detectó una soltura clara" in c.label]
+
+
+def test_start_second_slider_is_part_of_the_cache_key_and_shows_window(fake_clip, monkeypatch):
+    calls = []
+
+    def fake_extract(path, max_seconds=6.0, target_width=640, start_seconds=0.0, **kw):
+        calls.append(float(start_seconds))
+        return _synthetic_seq()
+
+    monkeypatch.setattr(PS, "extract_pose_sequence", fake_extract)
+    real = PS.detect_release_frame
+    monkeypatch.setattr(PS, "detect_release_frame", lambda *a, **k: {**real(*a, **k), "valid": True})
+    monkeypatch.setattr(VT, "video_seconds", lambda data, digest: 16.0)
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    assert "Se analizan" in _text(at) and "de un video de 16.0 s" in _text(at) and "de 0.0 a" in _text(at)
+    sl = [x for x in at.slider if x.label == "Segundo de inicio"]
+    assert len(sl) == 1 and sl[0].max == 15.0 and sl[0].min == 0.0
+    sl[0].set_value(10.0).run()
+    assert not at.exception, [e.value for e in at.exception]
+    assert calls == [0.0, 10.0] and "de 10.0 a" in _text(at)
+    [x for x in at.slider if x.label == "Segundo de inicio"][0].set_value(0.0).run()
+    assert calls == [0.0, 10.0]                                                 # volver a 0 usa el caché
+
+
+# ----------------------------------------------------------------------------
+# Salto entre pestañas
+# ----------------------------------------------------------------------------
+def test_tab_jump_is_injected_once_per_click_with_toast_and_pill(monkeypatch):
+    import streamlit.components.v1 as cv1
+    injected = []
+    monkeypatch.setattr(cv1, "html", lambda body, **kw: injected.append((body, kw)))
+
+    def app():
+        import streamlit as st
+        from dashboard import components as C
+        tabs = st.tabs(["Simulador", "Sculptor"])
+        C.consume_tab_jump()
+        with tabs[1]:
+            C.context_pill("Sculptor")
+            st.button("ir", key="go", on_click=C.request_tab_jump, args=("Sculptor", "VeloVision", "Parámetros cargados en Sculptor"))
+        st.button("otro", key="other")
+
+    at = AppTest.from_function(app, default_timeout=30).run()
+    assert not at.exception and injected == []                       # sin clic no hay salto
+    at.button(key="go").click().run()
+    assert len(injected) == 1 and not at.exception
+    body, kw = injected[0]
+    assert kw.get("height") == 0 and '[role="tab"]' in body and '"Sculptor"' in body
+    assert "textContent" in body and "setTimeout" in body and "scrollTo(0,0)" in body       # por texto, con reintentos, al inicio
+    assert any("Parámetros cargados en Sculptor" in t.value for t in at.toast)
+    assert "Cargado desde VeloVision" in _text(at)
+    at.button(key="other").click().run()                              # un rerun cualquiera no vuelve a saltar
+    at.run()
+    assert len(injected) == 1
+    at.button(key="go").click().run()                                 # un nuevo clic sí
+    assert len(injected) == 2
+
+
+def test_velovision_button_requests_jump_to_sculptor(fake_clip, monkeypatch):
+    _inject(monkeypatch, _synthetic_seq())
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    at.button(key="vv_confirm").click().run()
+    at.checkbox(key="vv_use_radar").check().run()
+    at.number_input(key="vv_velo").set_value(91.5).run()
+    at.button(key="vv_to_sculptor").click().run()
+    req = at.session_state["_tab_jump"]
+    assert req["label"] == "Sculptor" and req["source"] == "VeloVision"
+    assert at.session_state["_tab_context"]["Sculptor"] == "VeloVision"
+
+
+def test_leaderboard_and_sculptor_load_buttons_use_the_jump_helper():
+    import inspect
+    from dashboard import leaderboard_tab, sculptor_tab
+    for mod in (leaderboard_tab, sculptor_tab):
+        assert "click_and_jump" in inspect.getsource(mod)
+    assert "consume_tab_jump" in (ROOT / "dashboard" / "app.py").read_text(encoding="utf-8")

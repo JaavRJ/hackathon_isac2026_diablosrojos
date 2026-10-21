@@ -604,3 +604,80 @@ def narrowing_table(rows: Sequence[dict]) -> str:
                     f'<td>{r["n_pitchers_without_velo"]} → {r["n_pitchers_with_velo"]}</td></tr>')
     return ('<div class="dr-tblwrap dr-tblx"><table class="dr-tbl"><thead><tr><th>Familia</th><th>Ancho p25–p75 sin radar</th><th>con radar</th>'
             f'<th>Cambio</th><th>Pitchers</th></tr></thead><tbody>{"".join(body)}</tbody></table></div>')
+
+
+# ----------------------------------------------------------------------------
+# Salto entre pestañas (Streamlit no cambia de st.tabs desde Python)
+# ----------------------------------------------------------------------------
+TAB_JUMP_KEY = "_tab_jump"          # {"label", "source", "toast", "done"}: pedido pendiente (one-shot)
+TAB_CONTEXT_KEY = "_tab_context"    # {pestaña destino: origen} mientras el contexto cargado siga vigente
+
+
+def tab_jump_js(label: str) -> str:
+    """JS del componente: busca el ``[role="tab"]`` por TEXTO (no por índice), le hace click y sube al inicio.
+    Reintenta ~3 s con ``setTimeout`` por si el DOM aún no está listo; si el navegador bloquea el acceso al
+    documento padre, falla en silencio (el toast y la pastilla siguen avisando)."""
+    import json
+
+    return (
+        "<script>(function(){var label=" + json.dumps(label) + ";var tries=0;"
+        "function go(){try{var d=window.parent.document;var tabs=d.querySelectorAll('[role=\"tab\"]');"
+        "for(var i=0;i<tabs.length;i++){if((tabs[i].textContent||'').trim()===label){tabs[i].click();"
+        "try{window.parent.scrollTo(0,0);var m=d.querySelector('[data-testid=\"stMain\"],section.main');"
+        "if(m){m.scrollTo(0,0);}}catch(e){}return true;}}}catch(e){}return false;}"
+        "function attempt(){if(go()||++tries>20){return;}setTimeout(attempt,150);}attempt();})();</script>"
+    )
+
+
+def switch_to_tab(label: str) -> None:
+    """Inyecta un componente mínimo (``components.v1.html``, height=0) que activa la pestaña ``label``.
+
+    One-shot: solo actúa si hay un salto pendiente a ``label`` (``request_tab_jump``) y lo marca como hecho,
+    así que ocurre una vez por clic y no en cada rerun. Muestra además un ``st.toast`` que avisa aunque el
+    salto falle (p. ej. si el navegador bloquea el documento padre)."""
+    import streamlit as st
+    import streamlit.components.v1 as components
+
+    req = st.session_state.get(TAB_JUMP_KEY)
+    if not req or req.get("done") or req.get("label") != label:
+        return
+    req["done"] = True
+    st.session_state[TAB_JUMP_KEY] = req
+    components.html(tab_jump_js(label), height=0)
+    st.toast(req.get("toast") or f"Parámetros cargados en {label}")
+
+
+def request_tab_jump(label: str, source: str, toast: str | None = None) -> None:
+    """Pide saltar a ``label`` en el siguiente rerun y recuerda de dónde viene el contexto cargado.
+    Seguro dentro de un ``on_click``."""
+    import streamlit as st
+
+    st.session_state[TAB_JUMP_KEY] = {"label": label, "source": source, "toast": toast, "done": False}
+    ctx = dict(st.session_state.get(TAB_CONTEXT_KEY) or {})
+    ctx[label] = source
+    st.session_state[TAB_CONTEXT_KEY] = ctx
+
+
+def click_and_jump(callback, label: str, source: str, toast: str | None, *args) -> None:
+    """``on_click`` que ejecuta ``callback(*args)`` y luego pide el salto a ``label``."""
+    if callback is not None:
+        callback(*args)
+    request_tab_jump(label, source, toast)
+
+
+def consume_tab_jump() -> None:
+    """Llamar una vez por rerun, tras crear las pestañas: ejecuta el salto pendiente (si lo hay)."""
+    import streamlit as st
+
+    req = st.session_state.get(TAB_JUMP_KEY)
+    if req and not req.get("done"):
+        switch_to_tab(req["label"])
+
+
+def context_pill(tab_label: str, active: bool = True) -> None:
+    """Pastilla discreta "Cargado desde X" en la pestaña destino mientras el contexto siga vigente."""
+    import streamlit as st
+
+    source = (st.session_state.get(TAB_CONTEXT_KEY) or {}).get(tab_label)
+    if source and active:
+        st.markdown(f'<span class="dr-ok">{icon("check")}Cargado desde {esc(source)}</span>', unsafe_allow_html=True)

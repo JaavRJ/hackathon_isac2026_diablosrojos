@@ -224,3 +224,91 @@ def velo_narrowing_report(
             "n_pitchers_with_velo": nv,
         })
     return rows
+
+
+# ------------------------------------------------------------------ plausibilidad
+PLAUS_LOW_Q, PLAUS_HIGH_Q = 0.5, 99.5      # percentiles del rango "plausible" (supuesto de diseño)
+REFERENCE_NOTE = ("Referencia de lo que logran pitchers LMB con una mecánica parecida; "
+                  "no es el nivel de este lanzador.")
+
+# medida -> (columna del catálogo, etiqueta, unidad, decimales, claves aceptadas del error sistemático)
+_PLAUS_MEASURES = {
+    "rel_height_ft": ("RelHeight", "Altura de soltura", "ft", 2, ("rel_height_ft", "rel_height_sys_err_ft")),
+    "arm_slot_dataset_deg": ("arm_slot_deg", "Arm slot", "°", 1,
+                             ("arm_slot_dataset_deg", "arm_slot_deg", "slot_sys_err_deg")),
+}
+
+
+def _sys_err(sys_errs: dict | None, keys) -> float:
+    for k in keys:
+        v = (sys_errs or {}).get(k)
+        if v is not None and np.isfinite(float(v)):
+            return abs(float(v))
+    return 0.0
+
+
+def plausibility_report(
+    rel_height_ft: float | None,
+    rel_side_ft: float | None,
+    arm_slot_dataset_deg: float | None,
+    throws: str,
+    sys_errs: dict | None = None,
+    catalog=None,
+) -> dict[str, Any]:
+    """Compara cada medida del video con la LMB de la MISMA mano (un registro por pitcher-año).
+
+    Rango plausible = [p0.5, p99.5] del catálogo ``pitcher_arsenal_breakdown.csv``, ampliado por el error
+    sistemático de la medida (``sys_errs``: ``rel_height_ft``/``rel_height_sys_err_ft``,
+    ``arm_slot_dataset_deg``/``slot_sys_err_deg``). Todas las cifras salen del catálogo.
+
+    Por medida devuelve ``status`` ("dentro" | "fuera" | "sin referencia"), ``percentile`` (aproximado,
+    0-100, en la liga), ``low``/``high`` (límites del catálogo, sin ampliar), ``err`` y ``text`` (español).
+    El catálogo NO trae el lado de soltura (``RelSide``): esa medida queda "sin referencia" y no cuenta
+    como fuera. No bloquea nada: solo informa; ``any_outside`` alimenta la confirmación hacia el Sculptor.
+    """
+    hand = normalize_throws(throws)
+    df = _load_catalog(catalog)
+    df = df[df["PitcherThrows"].map(normalize_throws) == hand]
+    unit_df = df.groupby(["pitcher_anon_id", "year"] if "year" in df.columns else ["pitcher_anon_id"],
+                         as_index=False)[["RelHeight", "arm_slot_deg"]].mean()
+
+    values = {"rel_height_ft": rel_height_ft, "arm_slot_dataset_deg": arm_slot_dataset_deg}
+    report: dict[str, Any] = {}
+    for key, (col, label, unit, dec, err_keys) in _PLAUS_MEASURES.items():
+        v = values[key]
+        ref = unit_df[col].dropna().to_numpy(dtype=float)
+        if v is None or not np.isfinite(float(v)) or ref.size == 0:
+            report[key] = {"status": "sin referencia", "value": None, "percentile": None, "low": None,
+                           "high": None, "err": 0.0, "n_reference": int(ref.size),
+                           "text": f"{label}: sin medida para comparar con la LMB."}
+            continue
+        v = float(v)
+        lo, hi = (float(x) for x in np.percentile(ref, [PLAUS_LOW_Q, PLAUS_HIGH_Q]))
+        err = _sys_err(sys_errs, err_keys)
+        pct = float(100.0 * np.mean(ref <= v))
+        f = lambda x: f"{x:.{dec}f}"
+        measured = f"{label} {'medido' if key == 'arm_slot_dataset_deg' else 'medida'} {f(v)} {unit}"
+        if v > hi + err:
+            status = "fuera"
+            text = (f"{measured}, por encima de cualquier lanzador LMB (p99.5 de la LMB ~{f(hi)} {unit}): revisa la "
+                    "estatura y la cámara, o es una mecánica atípica")
+        elif v < lo - err:
+            status = "fuera"
+            text = (f"{measured}, por debajo de cualquier lanzador LMB (p0.5 de la LMB ~{f(lo)} {unit}): revisa la "
+                    "estatura y la cámara, o es una mecánica atípica")
+        else:
+            status = "dentro"
+            text = f"{measured}, dentro del rango de la LMB (percentil ~{pct:.0f} de la liga)"
+        report[key] = {"status": status, "value": v, "percentile": pct, "low": lo, "high": hi, "err": err,
+                       "n_reference": int(ref.size), "text": text}
+    report["rel_side_ft"] = {
+        "status": "sin referencia", "value": None if rel_side_ft is None else float(rel_side_ft),
+        "percentile": None, "low": None, "high": None,
+        "err": _sys_err(sys_errs, ("rel_side_ft", "rel_side_sys_err_ft")), "n_reference": 0,
+        "text": ("Lado de soltura: el catálogo de la LMB no incluye el lado, así que no hay con qué compararlo; "
+                 "queda solo con su error sistemático."),
+    }
+    outside = [k for k, r in report.items() if r["status"] == "fuera"]
+    report["outside"] = outside
+    report["any_outside"] = bool(outside)
+    return report

@@ -109,6 +109,23 @@ DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FPS = 640, 480, 30.0
 VIS_MIN = 0.5          # visibilidad para considerar un landmark "visible"
 VIS_NAN = 0.3          # por debajo => landmark tratado como faltante (NaN)
 QUALITY_MIN = 0.6      # umbral sugerido para la puerta de calidad (17-C)
+# Umbrales de la puerta que BLOQUEA (SUPUESTOS DE DISEÑO, calibrados el 2026-10-21 con 4 clips de stock
+# locales; no vienen de datos de validacion. Revisar con la anotacion humana de 17-D).
+# Un motivo bloqueante pone ``quality_ok = False`` aunque ``quality_score`` >= QUALITY_MIN.
+#  * SUBJECT_BLOCK_FRAC: alto nariz->tobillos / alto del cuadro. Por debajo, el error de escala en pies
+#    por pixel crece demasiado. Medido: pitcher diminuto = 0.22 (bloquea); los clips utiles 0.59-0.65.
+#  * PROFILE_BLOCK_RATIO: ancho de hombros / largo del torso (mediana de los primeros frames). Por debajo,
+#    el brazo se proyecta sobre el torso y el slot 2D no es interpretable. Medido: perfil = 0.08-0.12
+#    (bloquea); la diagonal util = 0.54 (no). El aviso suave (penalizacion x0.85) sigue en 0.5.
+#  * Landmarks clave faltantes: no se pudo medir en el frame (hombro, muneca, cadera o pie de apoyo).
+SUBJECT_BLOCK_FRAC = 0.30
+PROFILE_BLOCK_RATIO = 0.25
+# Validez de la deteccion de soltura (SUPUESTO calibrado con 4 clips de stock locales, 2026-10-21, no con
+# datos de validacion): ``detect_release_frame`` es valido solo si el pico de velocidad ponderada de la
+# muneca (``peak_score``, torsos/s) es >= RELEASE_PEAK_MIN Y la muneca pasa por delante del hombro en algun
+# frame. Medido: clips con soltura = pico 3.57-12.83 (confianza 0.39-0.70); el tramo de preparacion de un clip
+# de 16 s = pico 0.02 (confianza 0.06) y la muneca nunca por delante. Revisar con la anotacion de 17-D.
+RELEASE_PEAK_MIN = 1.0
 NUM_LANDMARKS = 33
 
 NOSE = 0
@@ -139,6 +156,8 @@ class PoseSequence:
     fps/width/height: del clip procesado (width/height ya reducidos).
     frames: lista de T arreglos RGB uint8 reducidos (para la barra de frames),
         o None cuando la secuencia es sintetica.
+    start_seconds: segundo del video donde empieza el tramo analizado (0 por defecto).
+    total_seconds: duracion total del video en segundos (None si se desconoce).
     """
 
     landmarks: np.ndarray
@@ -146,6 +165,8 @@ class PoseSequence:
     width: int = DEFAULT_WIDTH
     height: int = DEFAULT_HEIGHT
     frames: Optional[list] = field(default=None, repr=False)
+    start_seconds: float = 0.0
+    total_seconds: Optional[float] = None
 
     def __post_init__(self) -> None:
         self.landmarks = _as_lm_array(self.landmarks)
@@ -286,8 +307,9 @@ def _make_detector() -> _Detector:
 
 
 def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0,
-                          target_width: int = 640, store_width: int = 480) -> PoseSequence:
-    """Lee hasta ``max_seconds`` del video, reduce a ``target_width`` (solo reduce,
+                          target_width: int = 640, store_width: int = 480,
+                          start_seconds: float = 0.0) -> PoseSequence:
+    """Lee hasta ``max_seconds`` del video a partir de ``start_seconds``, reduce a ``target_width`` (solo reduce,
     nunca amplia) y corre MediaPipe Pose por frame. Los frames sin persona quedan
     en NaN (la calidad resultante es baja, sin excepciones). ``frames`` guarda copias
     RGB de ancho ``store_width`` (<= target_width) para la barra de frames.
@@ -302,6 +324,11 @@ def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0
         if not math.isfinite(fps) or fps < 1.0:
             fps = DEFAULT_FPS
         max_frames = max(1, int(round(max_seconds * fps)))
+        n_total = float(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0)
+        total_seconds = (n_total / fps) if n_total > 0 else None
+        start_seconds = max(0.0, float(start_seconds or 0.0))
+        if start_seconds > 0:
+            cap.set(cv2.CAP_PROP_POS_FRAMES, int(round(start_seconds * fps)))
         lms, frames = [], []
         width = height = None
         while len(lms) < max_frames:
@@ -328,7 +355,7 @@ def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0
     if not lms:
         return PoseSequence(np.full((1, NUM_LANDMARKS, 3), np.nan), fps, int(target_width),
                             int(target_width * 3 // 4), None)
-    return PoseSequence(np.stack(lms), fps, width, height, frames)
+    return PoseSequence(np.stack(lms), fps, width, height, frames, start_seconds, total_seconds)
 
 
 # ----------------------------------------------------------- release frame
@@ -347,13 +374,17 @@ def _nms_peaks(score: np.ndarray, k: int = 3, min_sep: int = 3) -> list:
 def detect_release_frame(seq: SeqLike, throws: str) -> dict:
     """Sugiere el frame de soltura: velocidad maxima de la muñeca lanzadora (en
     torsos/s), ponderada por la extension del brazo y por estar por delante del
-    hombro. Devuelve ``{frame_idx, confidence, candidates}`` con ``candidates``
-    = top 3 ``{frame_idx, score}``. Sin datos validos: frame central, confianza 0.
+    hombro. Devuelve ``{frame_idx, confidence, candidates, peak_score, wrist_ahead, valid}`` con ``candidates``
+    = top 3 ``{frame_idx, score}``. ``peak_score`` es el score del pico, ``wrist_ahead`` si en algun frame la
+    muñeca pasa por delante del hombro y ``valid`` es False si ``peak_score < RELEASE_PEAK_MIN`` o la muñeca
+    nunca pasa por delante (probablemente es la preparación, no la soltura). Sin datos validos: frame
+    central, confianza 0 y ``valid`` False.
     """
     s = _resolve(seq)
     ix = _idx(throws)
     T = s.n_frames
-    fallback = {"frame_idx": T // 2, "confidence": 0.0, "candidates": []}
+    fallback = {"frame_idx": T // 2, "confidence": 0.0, "candidates": [],
+                "peak_score": 0.0, "wrist_ahead": False, "valid": False}
     if T < 3:
         return fallback
     wr, sh, el = _px(s, ix["wr"]), _px(s, ix["sh"]), _px(s, ix["el"])
@@ -376,6 +407,7 @@ def detect_release_frame(seq: SeqLike, throws: str) -> dict:
         gate = np.where(np.isfinite(ahead), np.where(ahead, 1.0, 0.3), 1.0)
         score = speed * ext_w * gate
     score = np.nan_to_num(score, nan=0.0)
+    wrist_ahead = bool(np.any(ahead & np.isfinite(wr[:, 0]) & np.isfinite(hip_mid[:, 0]) & np.isfinite(sh[:, 0])))
     peaks = _nms_peaks(score)
     if not peaks:
         return fallback
@@ -385,7 +417,9 @@ def detect_release_frame(seq: SeqLike, throws: str) -> dict:
     vis = float(np.mean([_vis(s, ix["wr"])[best_i], _vis(s, ix["sh"])[best_i], _vis(s, ix["el"])[best_i]]))
     conf = float(np.clip(prominence * vis, 0.0, 1.0))
     return {"frame_idx": int(best_i), "confidence": conf,
-            "candidates": [{"frame_idx": int(i), "score": float(v)} for i, v in peaks]}
+            "candidates": [{"frame_idx": int(i), "score": float(v)} for i, v in peaks],
+            "peak_score": float(best_v), "wrist_ahead": wrist_ahead,
+            "valid": bool(best_v >= RELEASE_PEAK_MIN and wrist_ahead)}
 
 
 # ------------------------------------------------------------------ medicion
@@ -420,7 +454,9 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     Devuelve ``rel_height_ft, rel_side_ft, arm_slot_dataset_deg,
     arm_angle_biomech_deg`` (``None`` si no se pudo medir), ``quality_score``
     (0-1), ``quality_issues`` (textos en español con accion), ``quality_ok``
-    (score >= QUALITY_MIN y medicion posible) y ``ft_per_px``. Declara ademas el
+    (score >= QUALITY_MIN, medicion posible y SIN ``blocking_issues``), ``blocking_issues``
+    (textos de los motivos que bloquean aunque el puntaje pase: sujeto muy pequeño, vista de
+    perfil, landmarks clave faltantes; lista vacia si no hay) y ``ft_per_px``. Declara ademas el
     error sistematico supuesto: ``rel_height_sys_err_ft``, ``rel_side_sys_err_ft``,
     ``slot_sys_err_deg`` (propagado por esquinas; None si no se midio) y
     ``origin_notes`` (como se fijo el origen de altura y lado). La formula del slot
@@ -432,6 +468,7 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     i = int(np.clip(frame_idx, 0, T - 1))
     lm = s.landmarks[i]
     issues: list = []
+    blocking: list = []
     out = dict(frame_idx=i, throws=str(throws).upper()[:1], height_ft=float(height_ft),
                rel_height_ft=None, rel_side_ft=None, arm_slot_dataset_deg=None,
                arm_angle_biomech_deg=None, ft_per_px=None,
@@ -460,6 +497,10 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     if size_score < 0.67 and finite.any():
         issues.append("Sujeto muy pequeño en el cuadro: acércate o haz zoom para que el lanzador "
                       "ocupe al menos la mitad del alto del video.")
+    if finite.any() and frac < SUBJECT_BLOCK_FRAC:
+        blocking.append(f"Sujeto muy pequeño: el lanzador ocupa {100 * max(frac, 0.0):.0f} % del alto del video "
+                        f"(mínimo {100 * SUBJECT_BLOCK_FRAC:.0f} %). La escala en pies sería poco fiable: "
+                        "acércate o haz zoom y vuelve a grabar.")
     margin = 0.02
     inside = finite & (xy[:, 0] > margin) & (xy[:, 0] < 1 - margin) & (xy[:, 1] > margin) & (xy[:, 1] < 1 - margin)
     body_score = float(inside.mean())
@@ -477,10 +518,14 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
             if torso > 0:
                 ratios.append(float(np.linalg.norm(sh_l - sh_r)) / torso)
     if ratios:
-        if float(np.median(ratios)) < 0.5:
+        med_ratio = float(np.median(ratios))
+        if med_ratio < 0.5:
             view_factor = 0.85
             issues.append("Vista de perfil: coloca la cámara de frente o ligeramente de 3/4 "
                           "(a la altura del pecho) para medir el slot.")
+        if med_ratio < PROFILE_BLOCK_RATIO:
+            blocking.append("Vista de perfil: los hombros se ven casi superpuestos, así que el arm slot en 2D "
+                            "no es interpretable. Coloca la cámara de frente o ligeramente de 3/4.")
 
     quality = (0.5 * vis_score + 0.25 * size_score + 0.25 * body_score) * view_factor
 
@@ -504,6 +549,8 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
         issues.append("No se pudo escalar a pies (faltan nariz o tobillos): "
                       "asegura que el cuerpo completo salga en el video.")
         quality = min(quality, 0.3)
+        if math.isfinite(h) and 4.0 <= h <= 7.5:
+            blocking.append("Faltan landmarks clave en el frame (nariz o tobillos): sin ellos no hay escala en pies.")
     out["ft_per_px"] = ft_per_px
 
     # medicion
@@ -516,6 +563,8 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
         quality = min(quality, 0.5)
         issues.append("Tobillo de apoyo poco visible: la altura y el lado dependen de ese pie. "
                       "Regraba con el pie de apoyo completo en cuadro y sin objetos que lo tapen.")
+        blocking.append("Faltan landmarks clave en el frame: el tobillo de apoyo no se ve y de él dependen "
+                        "la altura y el lado. Regraba con el pie de apoyo completo en cuadro.")
     ok_geom = bool(np.isfinite([sh_t, wr_t, sh_o, support]).all()) and bool(np.isfinite(hips).all())
     if ft_per_px is not None and ok_geom and vis[4] >= VIS_NAN and sup_vis >= VIS_NAN:
         # origen lateral: x del pie de apoyo al inicio de la entrega (proxy de la goma)
@@ -551,11 +600,14 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
         if ft_per_px is not None:
             issues.append("Faltan landmarks de hombro, muñeca, cadera o tobillo en este frame: "
                           "elige otro frame de soltura o regraba con el cuerpo completo visible.")
+            blocking.append("Faltan landmarks clave en el frame (hombro, muñeca, cadera o tobillo): elige otro "
+                            "frame de soltura o regraba con el cuerpo completo visible.")
 
     out["quality_score"] = float(np.clip(quality, 0.0, 1.0))
     out["quality_issues"] = issues
+    out["blocking_issues"] = blocking
     out["quality_ok"] = bool(out["quality_score"] >= QUALITY_MIN
-                             and out["arm_slot_dataset_deg"] is not None)
+                             and out["arm_slot_dataset_deg"] is not None and not blocking)
     return out
 
 

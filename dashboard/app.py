@@ -538,7 +538,9 @@ def main() -> None:
     render_header(meta)
 
     tabs = st.tabs(["Simulador", "Mapa de movimiento", "Leaderboard", "Sculptor", "VeloVision", "Modo anotación"])
+    C.consume_tab_jump()      # salto one-shot pedido por un botón "Llevar a…" (ver components.switch_to_tab)
     with tabs[0]:
+        C.context_pill("Simulador", active=st.session_state.get("source_mode") == "REAL_PITCHER")
         render_simulator(reports, meta)
     with tabs[1]:
         render_movement_map(reports)

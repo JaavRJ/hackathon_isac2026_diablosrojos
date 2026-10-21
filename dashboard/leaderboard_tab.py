@@ -133,6 +133,7 @@ def _stamp(lb, ars, pid: str, yr: int, meta: dict, load_cb) -> None:
             snap = {"pitcher_anon_id": pid, "year": yr, "pitch_id": str(top["pitch_id"]),
                     "n_pitches": int(top["n_pitches"]), "inputs": dict(values)}
             st.button(f"Llevar al Simulador ({top['pitch_id']})", key="btn_to_sim", type="primary", width="stretch",
-                      on_click=load_cb, args=(values, snap))
+                      on_click=C.click_and_jump,
+                      args=(load_cb, "Simulador", "Leaderboard", "Pitcheo cargado en Simulador", values, snap))
             if st.session_state.get("_loaded_flash") == f"{pid}-{yr}":
                 st.caption("Cargado: abre la pestaña Simulador.")

@@ -98,7 +98,8 @@ def test_detect_release_tolerates_missing_landmarks():
     seq[5:12, ps.R_WRIST] = np.nan
     seq[:, ps.R_ELBOW, 2] = 0.0
     res = detect_release_frame(seq, "R")
-    assert set(res) == {"frame_idx", "confidence", "candidates"}
+    assert {"frame_idx", "confidence", "candidates"} <= set(res)      # los campos nuevos se suman, no se quitan
+    assert {"peak_score", "wrist_ahead", "valid"} <= set(res)
     empty = detect_release_frame(np.full((10, 33, 3), np.nan), "L")
     assert empty["confidence"] == 0.0 and empty["candidates"] == []
     assert detect_release_frame(seq[:2], "R")["confidence"] == 0.0
@@ -320,3 +321,112 @@ def test_detector_is_closed(tmp_path, monkeypatch):
         pass
     d.close()
     assert closed == [1]
+
+
+
+# --------------------------------------------------------------------------
+# Puerta que BLOQUEA (ajustes tras la primera prueba con video real)
+# --------------------------------------------------------------------------
+def _good_kp(n=12):
+    return np.stack([skeleton("R", wrist_for("R", 6.0, 6.3, 1.0)) for _ in range(n)])
+
+
+def _measure(kp):
+    return measure_release(PoseSequence.from_keypoints(kp, 30.0, W, H), 0, "R", 6.0)
+
+
+def test_good_frontal_subject_has_no_blocking_issues():
+    m = _measure(_good_kp())
+    assert m["blocking_issues"] == [] and m["quality_ok"] is True
+    for k in ("quality_score", "quality_issues", "rel_height_ft", "arm_slot_dataset_deg"):   # no se quitan campos
+        assert k in m
+
+
+def test_tiny_subject_blocks_even_if_score_passes():
+    kp = _good_kp()
+    kp[:, :, :2] = 0.5 + (kp[:, :, :2] - 0.5) * 0.4
+    kp[:, :, 1] += 0.2
+    frac = float(kp[0, ps.R_ANKLE, 1] - kp[0, ps.NOSE, 1])
+    assert frac < ps.SUBJECT_BLOCK_FRAC
+    m = _measure(kp)
+    assert m["quality_score"] >= ps.QUALITY_MIN
+    assert m["quality_ok"] is False
+    assert any("Sujeto muy pequeño" in b for b in m["blocking_issues"])
+
+
+def test_profile_view_blocks_but_oblique_view_only_warns():
+    kp = _good_kp()
+    kp[:, ps.R_SHOULDER, 0], kp[:, ps.L_SHOULDER, 0] = 0.49, 0.51
+    m = _measure(kp)
+    assert m["quality_score"] >= ps.QUALITY_MIN
+    assert m["quality_ok"] is False and any("Vista de perfil" in b for b in m["blocking_issues"])
+    obl = _good_kp()
+    obl[:, ps.R_SHOULDER, 0], obl[:, ps.L_SHOULDER, 0] = 0.4625, 0.5375
+    m2 = _measure(obl)
+    assert m2["blocking_issues"] == [] and m2["quality_ok"] is True
+    assert any("Vista de perfil" in i for i in m2["quality_issues"])
+
+
+def test_missing_key_landmarks_block():
+    kp = _good_kp()
+    kp[:, ps.R_HIP, :] = np.nan          # asi llega un landmark no detectado del extractor
+    kp[:, ps.L_HIP, :] = np.nan
+    m = _measure(kp)
+    assert m["quality_ok"] is False
+    assert any("landmarks clave" in b for b in m["blocking_issues"])
+    kp2 = _good_kp()
+    kp2[:, ps.L_ANKLE, 2] = 0.1
+    m2 = _measure(kp2)
+    assert m2["quality_ok"] is False and any("tobillo de apoyo" in b for b in m2["blocking_issues"])
+
+
+# --------------------------------------------------------------------------
+# Validez de la deteccion de soltura y tramo inicial del video
+# --------------------------------------------------------------------------
+def test_release_without_peak_is_invalid():
+    seq = np.stack([skeleton("R", (0.30, 0.10)) for _ in range(40)])            # brazo arriba pero quieto
+    seq[:, ps.R_WRIST, 0] += np.random.default_rng(0).normal(0, 1e-4, 40)       # ruido minimo
+    res = detect_release_frame(seq, "R")
+    assert res["wrist_ahead"] is True
+    assert res["peak_score"] < ps.RELEASE_PEAK_MIN and res["valid"] is False
+
+
+def test_release_with_wrist_never_ahead_of_shoulder_is_invalid():
+    seq = np.stack([skeleton("R") for _ in range(40)])
+    wr = np.tile(np.array([0.40, 0.56]), (40, 1))                               # muñeca junto a la cadera
+    wr[::2, 0] = 0.52                                                           # vaiven rapido, siempre abajo
+    seq[:, ps.R_WRIST, :2] = wr
+    res = detect_release_frame(seq, "R")
+    assert res["wrist_ahead"] is False and res["valid"] is False
+
+
+def test_extract_start_seconds_trims_and_reports_duration(tmp_path, monkeypatch):
+    monkeypatch.setattr(ps, "_make_detector", lambda: (lambda rgb: None))
+    v = tmp_path / "clip.mp4"
+    write_video(v, n=90, fps=30, size=(320, 240))                               # 3 s, el cuadro avanza 1 px por frame
+    full = extract_pose_sequence(v, max_seconds=1.0)
+    cut = extract_pose_sequence(v, max_seconds=1.0, start_seconds=1.0)
+    assert full.start_seconds == 0.0 and cut.start_seconds == 1.0
+    assert cut.total_seconds == pytest.approx(3.0, abs=0.1) and full.total_seconds == pytest.approx(3.0, abs=0.1)
+    assert cut.n_frames == 30 == full.n_frames
+
+    def rect_x(seq):
+        row = seq.frames[0][100, :, 0]
+        return int(np.argmax(row < 100))
+
+    assert abs((rect_x(cut) - rect_x(full)) - 30) <= 3                         # empezó 30 frames después
+    tail = extract_pose_sequence(v, max_seconds=5.0, start_seconds=2.0)
+    assert tail.n_frames == pytest.approx(30, abs=2)                           # solo queda 1 s
+
+
+def test_release_with_clear_sweep_is_valid():
+    T, peak = 40, 25
+    seq = np.stack([skeleton("R") for _ in range(T)])
+    seq[:, ps.R_ELBOW, :2] = (0.40, 0.17)
+    wr = np.tile(np.array([0.40, 0.22]), (T, 1))              # brazo recogido arriba, casi quieto
+    for t, xy in {peak - 2: (0.30, 0.20), peak - 1: (0.34, 0.08), peak: (0.40, 0.05),
+                  peak + 1: (0.46, 0.08), peak + 2: (0.50, 0.14)}.items():
+        wr[t] = xy
+    seq[:, ps.R_WRIST, :2] = wr
+    res = detect_release_frame(seq, "R")
+    assert res["valid"] is True and res["wrist_ahead"] is True and res["peak_score"] >= ps.RELEASE_PEAK_MIN

@@ -54,15 +54,28 @@ def _sculptor():
     return _load()
 
 
-def compute_sculptor(params: dict) -> dict:
-    """Resultado COMPLETO de ``PitchSculptor.find_feasible_references`` (cacheado por parametros)."""
+def compute_sculptor(params: dict, tolerances: dict | None = None) -> dict:
+    """Resultado COMPLETO de ``PitchSculptor.find_feasible_references`` (cacheado por parametros).
+
+    ``tolerances`` (opcional, ``arm_slot_deg``/``RelHeight``/``fb_velo``) viene de VeloVision; sin ellas se
+    usan las estándar.
+    """
     import streamlit as st
 
     @st.cache_data(show_spinner=False, max_entries=128)
-    def _run(key: tuple) -> dict:
-        return _sculptor().find_feasible_references(dict(key))
+    def _run(key: tuple, tol_key: tuple) -> dict:
+        return _sculptor().find_feasible_references(dict(key), tolerances=dict(tol_key) or None)
 
-    return _run(tuple(sorted(params.items())))
+    return _run(tuple(sorted(params.items())), tuple(sorted((tolerances or {}).items())))
+
+
+def video_tolerances() -> dict | None:
+    """Tolerancias ampliadas que VeloVision dejó con el pitcheo activo (solo mientras su override siga vigente)."""
+    import streamlit as st
+
+    if not st.session_state.get("vv_override"):
+        return None
+    return st.session_state.get("vv_tolerances") or None
 
 
 def render_sculptor_result(res: dict, params: dict, user_score: float | None, kp: str, ctx: dict | None = None,
@@ -75,6 +88,10 @@ def render_sculptor_result(res: dict, params: dict, user_score: float | None, kp
              f"±{f['fb_velo_tol_mph']:.1f} mph recta", f"≥ {f['min_pitches']} pitcheos"]
     st.markdown(C.provenance_row(["PitchSculptor (HACK-016)", "fuente: pitcher_arsenal_breakdown.csv",
                                   "2026 fuera de muestra"]), unsafe_allow_html=True)
+    if res.get("tolerance_source") == "ampliadas por el error del video":
+        st.markdown(f'<div class="note">{C.icon("ruler")}Tolerancias ampliadas por el error del video: '
+                    f'{C.esc(" · ".join(chips[1:4]))}. No es una relajación silenciosa: se declara aquí.</div>',
+                    unsafe_allow_html=True)
     st.markdown(C.counter_card(res["n_peers"], f"en la LMB · {res['pitch_id']}", chips)
                 if res["status"] == "INSUFFICIENT_PEERS" else "", unsafe_allow_html=True)
     if res["status"] == "INSUFFICIENT_PEERS":
@@ -134,13 +151,15 @@ def render_sculptor_result(res: dict, params: dict, user_score: float | None, kp
                 snap = {"pitcher_anon_id": ref["pitcher_anon_id"], "year": int(ref["year"]), "pitch_id": ref["pitch_id"],
                         "n_pitches": int(ref["n_pitches"]), "inputs": dict(values)}
                 st.button("Llevar referencia al Simulador", key=f"{kp}_load_ref", type="primary", width="stretch",
-                          on_click=ctx["load_cb"], args=(values, snap))
+                          on_click=C.click_and_jump,
+                          args=(ctx["load_cb"], "Simulador", "Sculptor", "Pitcheo cargado en Simulador", values, snap))
 
 
 def render_sculptor_tab(ctx: dict | None = None) -> None:
     import streamlit as st
 
     st.markdown(f"### {TAB_TITLE}")
+    C.context_pill("Sculptor", active=bool(st.session_state.get("vv_override")))
     st.caption(
         "Búsqueda de referencias reales de la LMB con la misma mano, arm slot, altura de "
         "liberación y velocidad. No genera pitcheos nuevos ni garantiza resultados. "
@@ -163,7 +182,7 @@ def render_sculptor_tab(ctx: dict | None = None) -> None:
     params = {"PitcherThrows": throws, "arm_slot_deg": float(arm_slot), "RelHeight": float(rel_height),
               "fb_velo": float(fb_velo), "pitch_id": pitch_id}
     score = pre["score"] if pitch_id == pre["pitch_id"] and pre["score"] is not None else None
-    res = compute_sculptor({**params, "user_stuff_plus_cdmx": score})
+    res = compute_sculptor({**params, "user_stuff_plus_cdmx": score}, video_tolerances())
     snap = st.session_state.get("loaded_pitcher_snapshot")
     render_sculptor_result(res, params, score, "sc", ctx, snap)
     if res["coaching_guide"] is None and res["status"] == "INSUFFICIENT_PEERS":

@@ -28,6 +28,10 @@ ARM_SLOT_TOL_DEG = 6.0
 REL_HEIGHT_TOL_FT = 0.35
 FB_VELO_TOL_MPH = 2.0
 MIN_PEERS = 5
+DEFAULT_TOLERANCES = {"arm_slot_deg": ARM_SLOT_TOL_DEG, "RelHeight": REL_HEIGHT_TOL_FT, "fb_velo": FB_VELO_TOL_MPH}
+SOURCE_STANDARD = "estándar"
+SOURCE_WIDENED = "ampliadas por el error del video"
+SOURCE_CUSTOM = "personalizadas"
 MAX_COMPARABLES = 3
 
 _COACHING_TEXT = {
@@ -62,22 +66,56 @@ class PitchSculptor:
         self.catalog = df.reset_index(drop=True)
 
     # ------------------------------------------------------------------ filtros
-    def _feasible(self, params: dict, min_pitches: int) -> pd.DataFrame:
+    @staticmethod
+    def resolve_tolerances(tolerances: dict | None) -> tuple[dict, str]:
+        """Tolerancias efectivas (las que faltan toman el valor estándar) y su etiqueta de origen."""
+        tol = dict(DEFAULT_TOLERANCES)
+        for k, v in (tolerances or {}).items():
+            if k not in DEFAULT_TOLERANCES:
+                raise ValueError(f"Tolerancia desconocida: {k!r} (use {', '.join(DEFAULT_TOLERANCES)})")
+            if v is not None:
+                if not np.isfinite(float(v)) or float(v) <= 0:
+                    raise ValueError(f"La tolerancia {k} debe ser un número positivo")
+                tol[k] = float(v)
+        if tol == DEFAULT_TOLERANCES:
+            return tol, SOURCE_STANDARD
+        if all(tol[k] >= DEFAULT_TOLERANCES[k] for k in tol):
+            return tol, SOURCE_WIDENED
+        return tol, SOURCE_CUSTOM
+
+    def _feasible(self, params: dict, min_pitches: int, tol: dict | None = None) -> pd.DataFrame:
+        tol = tol or DEFAULT_TOLERANCES
         df = self.catalog
         mask = (
             (df["PitcherThrows"] == params["PitcherThrows"])
-            & ((df["arm_slot_deg"] - float(params["arm_slot_deg"])).abs() <= ARM_SLOT_TOL_DEG)
-            & ((df["RelHeight"] - float(params["RelHeight"])).abs() <= REL_HEIGHT_TOL_FT)
-            & ((df["fb_velo"] - float(params["fb_velo"])).abs() <= FB_VELO_TOL_MPH)
+            & ((df["arm_slot_deg"] - float(params["arm_slot_deg"])).abs() <= tol["arm_slot_deg"])
+            & ((df["RelHeight"] - float(params["RelHeight"])).abs() <= tol["RelHeight"])
+            & ((df["fb_velo"] - float(params["fb_velo"])).abs() <= tol["fb_velo"])
             & (df["n_pitches"] >= min_pitches)
         )
         out = df[mask].copy()
         out["_dist"] = (
-            (out["arm_slot_deg"] - float(params["arm_slot_deg"])).abs() / ARM_SLOT_TOL_DEG
-            + (out["RelHeight"] - float(params["RelHeight"])).abs() / REL_HEIGHT_TOL_FT
-            + (out["fb_velo"] - float(params["fb_velo"])).abs() / FB_VELO_TOL_MPH
+            (out["arm_slot_deg"] - float(params["arm_slot_deg"])).abs() / tol["arm_slot_deg"]
+            + (out["RelHeight"] - float(params["RelHeight"])).abs() / tol["RelHeight"]
+            + (out["fb_velo"] - float(params["fb_velo"])).abs() / tol["fb_velo"]
         )
         return out
+
+    def _stage_counts(self, params: dict, min_pitches: int, tol: dict) -> list[tuple[str, int]]:
+        """Pitchers distintos que quedan tras aplicar los filtros en orden (diagnóstico de INSUFFICIENT_PEERS)."""
+        df = self.catalog
+        mask = df["PitcherThrows"] == params["PitcherThrows"]
+        stages = [("misma mano", int(df.loc[mask, "pitcher_anon_id"].nunique()))]
+        steps = [
+            (f"arm slot ±{tol['arm_slot_deg']:.1f}°", (df["arm_slot_deg"] - float(params["arm_slot_deg"])).abs() <= tol["arm_slot_deg"]),
+            (f"altura ±{tol['RelHeight']:.2f} ft", (df["RelHeight"] - float(params["RelHeight"])).abs() <= tol["RelHeight"]),
+            (f"velocidad ±{tol['fb_velo']:.1f} mph", (df["fb_velo"] - float(params["fb_velo"])).abs() <= tol["fb_velo"]),
+            (f"≥ {min_pitches} pitcheos", df["n_pitches"] >= min_pitches),
+        ]
+        for name, cond in steps:
+            mask = mask & cond
+            stages.append((name, int(df.loc[mask, "pitcher_anon_id"].nunique())))
+        return stages
 
     # ----------------------------------------------------------------- búsqueda
     def find_feasible_references(
@@ -86,6 +124,7 @@ class PitchSculptor:
         k_neighbors: int = 25,
         min_pitches: int = 50,
         include_coaching_guide: bool = True,
+        tolerances: dict | None = None,
     ) -> dict[str, Any]:
         """Devuelve referencias reales factibles.
 
@@ -93,6 +132,10 @@ class PitchSculptor:
         ``fb_velo``, ``pitch_id`` y opcional ``user_stuff_plus_cdmx``.
         ``k_neighbors`` limita las filas de la misma familia (las más cercanas
         en geometría) usadas para el rango y las referencias.
+
+        ``tolerances``: opcional, claves ``arm_slot_deg``, ``RelHeight``, ``fb_velo``; lo que falte toma
+        el valor estándar (6.0, 0.35, 2.0). La salida declara ``tolerances_used`` y ``tolerance_source``
+        ("estándar" o "ampliadas por el error del video"); nunca se relaja un filtro en silencio.
         """
         needed = ["PitcherThrows", "arm_slot_deg", "RelHeight", "fb_velo", "pitch_id"]
         absent = [k for k in needed if pitch_params.get(k) is None]
@@ -100,7 +143,8 @@ class PitchSculptor:
             raise ValueError("Faltan parámetros del pitcheo: " + ", ".join(absent))
 
         pitch_id = pitch_params["pitch_id"]
-        feasible = self._feasible(pitch_params, min_pitches)
+        tol, tol_source = self.resolve_tolerances(tolerances)
+        feasible = self._feasible(pitch_params, min_pitches, tol)
         n_peers = int(feasible["pitcher_anon_id"].nunique())
 
         result: dict[str, Any] = {
@@ -109,11 +153,14 @@ class PitchSculptor:
             "n_peers": n_peers,
             "pitch_id": pitch_id,
             "filters": {
-                "arm_slot_tol_deg": ARM_SLOT_TOL_DEG,
-                "rel_height_tol_ft": REL_HEIGHT_TOL_FT,
-                "fb_velo_tol_mph": FB_VELO_TOL_MPH,
+                "arm_slot_tol_deg": tol["arm_slot_deg"],
+                "rel_height_tol_ft": tol["RelHeight"],
+                "fb_velo_tol_mph": tol["fb_velo"],
                 "min_pitches": min_pitches,
             },
+            "tolerances_used": dict(tol),
+            "tolerance_source": tol_source,
+            "filter_counts": None,
             "intra_family": None,
             "delta_gain_cdmx": None,
             "delta_gain_reason": None,
@@ -126,9 +173,21 @@ class PitchSculptor:
 
         if n_peers < MIN_PEERS:
             result["status"] = "INSUFFICIENT_PEERS"
+            stages = self._stage_counts(pitch_params, min_pitches, tol)
+            result["filter_counts"] = [{"filter": n, "n_pitchers": c} for n, c in stages]
+            prev = stages[0][1]
+            culprit = None
+            for name, c in stages[1:]:
+                if prev >= MIN_PEERS and c < MIN_PEERS:
+                    culprit = name
+                    break
+                prev = c
+            trail = " → ".join(f"{n}: {c}" for n, c in stages)
             result["reason"] = (
                 f"Solo {n_peers} pares reales cumplen el filtro de factibilidad "
-                f"(mínimo {MIN_PEERS}); los filtros no se relajan."
+                f"(mínimo {MIN_PEERS}); los filtros no se relajan. "
+                + (f"El filtro que dejó fuera a los pares fue {culprit}. " if culprit else "")
+                + f"Pitchers que quedan tras cada filtro ({tol_source}): {trail}."
             )
             result["delta_gain_reason"] = "Sin pares suficientes: no se emite diferencia."
             return result

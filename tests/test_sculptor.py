@@ -130,3 +130,56 @@ def test_no_forbidden_word_in_task_files():
     for f in TASK_FILES:
         text = f.read_text(encoding="utf-8").lower().replace(module, "")
         assert word not in text, f
+
+
+
+# --------------------------------------------------------------------------
+# Tolerancias opcionales (ajustes tras la primera prueba con video real)
+# --------------------------------------------------------------------------
+def test_default_tolerances_are_identical_to_before(catalog_df):
+    sc = PitchSculptor(catalog_df)
+    a = sc.find_feasible_references(PARAMS)
+    b = sc.find_feasible_references(PARAMS, tolerances={"arm_slot_deg": 6.0, "RelHeight": 0.35, "fb_velo": 2.0})
+    assert a["n_peers"] == b["n_peers"] == _passes(catalog_df).pitcher_anon_id.nunique()
+    assert a["tolerances_used"] == {"arm_slot_deg": 6.0, "RelHeight": 0.35, "fb_velo": 2.0}
+    assert a["tolerance_source"] == b["tolerance_source"] == "estándar"
+    assert a["filters"]["arm_slot_tol_deg"] == 6.0 and a["filters"]["rel_height_tol_ft"] == 0.35
+    assert a["filters"]["fb_velo_tol_mph"] == 2.0
+    assert a["intra_family"] == b["intra_family"] and a["comparables"] == b["comparables"]
+
+
+def test_widened_tolerances_find_more_peers_and_are_declared(catalog_df):
+    sc = PitchSculptor(catalog_df)
+    std = sc.find_feasible_references(PARAMS)
+    wide = sc.find_feasible_references(PARAMS, tolerances={"RelHeight": 0.75})
+    assert wide["n_peers"] == std["n_peers"] + 1
+    assert wide["tolerance_source"] == "ampliadas por el error del video"
+    assert wide["tolerances_used"]["RelHeight"] == 0.75 and wide["tolerances_used"]["arm_slot_deg"] == 6.0
+    assert wide["filters"]["rel_height_tol_ft"] == 0.75
+    assert wide["coaching_guide_label"] == COACHING_LABEL and "no es una ganancia causal" in wide["delta_gain_note"]
+    assert sc.find_feasible_references(PARAMS, tolerances={"arm_slot_deg": 16.0})["n_peers"] == std["n_peers"] + 1
+
+
+def test_bad_tolerances_are_rejected(catalog_df):
+    sc = PitchSculptor(catalog_df)
+    with pytest.raises(ValueError):
+        sc.find_feasible_references(PARAMS, tolerances={"velocidad": 3.0})
+    with pytest.raises(ValueError):
+        sc.find_feasible_references(PARAMS, tolerances={"RelHeight": 0.0})
+
+
+def test_insufficient_peers_message_names_the_responsible_filter(catalog_df):
+    df = catalog_df.copy()
+    df.loc[df.pitcher_anon_id.str.startswith("pitcher_0"), "RelHeight"] = 6.6
+    res = PitchSculptor(df).find_feasible_references(PARAMS)
+    assert res["status"] == "INSUFFICIENT_PEERS"
+    counts = {c["filter"]: c["n_pitchers"] for c in res["filter_counts"]}
+    assert counts["misma mano"] >= 8 and counts["arm slot ±6.0°"] >= 8
+    assert counts["altura ±0.35 ft"] < 5 and res["n_peers"] == counts["≥ 50 pitcheos"]
+    assert "altura ±0.35 ft" in res["reason"] and "dejó fuera" in res["reason"] and "no se relajan" in res["reason"]
+    assert res["intra_family"] is None and res["delta_gain_cdmx"] is None
+    wide = PitchSculptor(df).find_feasible_references(PARAMS, tolerances={"RelHeight": 1.0})
+    assert wide["status"] == "OK" and wide["tolerance_source"] == "ampliadas por el error del video"
+    still = PitchSculptor(df).find_feasible_references({**PARAMS, "fb_velo": 80.0}, tolerances={"RelHeight": 1.0})
+    assert still["status"] == "INSUFFICIENT_PEERS" and "velocidad" in still["reason"]
+    assert "ampliadas por el error del video" in still["reason"]

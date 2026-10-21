@@ -921,6 +921,65 @@
 
 ---
 
+#### Ajustes tras la primera prueba con video real (Orquestador con el usuario, 2026-10-21)
+Se probaron 3 clips de stock (solo para pruebas internas: son previews de iStock con marca de agua y no se usan en la demo ni en el paper).
+- Un clip pequeño y de perfil pasó la puerta de calidad (0.64) con slot 0°, y aun así el Sculptor dio resultados. **Error real.**
+- Un clip en diagonal midió `rel_height_ft` = 7.80 ft, por encima del p99 de la LMB (6.75 ft), y el Sculptor dio 0 pares porque filtra la altura a ±0.35 ft, menos que el error del video (±0.4 ft).
+
+Cambios autorizados:
+1. **Puerta de calidad que bloquea por sí sola** con sujeto demasiado pequeño, vista de perfil o landmarks clave faltantes en el frame, aunque `quality_score` ≥ `QUALITY_MIN`. Se expone como `quality_ok = False` y la lista de motivos bloqueantes.
+2. **Chequeo de plausibilidad contra la LMB.** Si la altura, el lado o el slot medidos caen fuera de [p0.5, p99.5] del catálogo, ampliado por su error sistemático, la UI explica dónde cae frente a la liga y sugiere revisar la estatura o la cámara, o considera una mecánica atípica. No bloquea la ficha, pero no envía al Sculptor sin confirmación del usuario.
+3. **Texto de referencia en la ficha:** "Referencia de lo que logran pitchers LMB con una mecánica parecida; no es el nivel de este lanzador."
+4. **Del video al Sculptor con tolerancias explícitas.** `PitchSculptor.find_feasible_references` acepta tolerancias opcionales (slot, altura, velocidad), con los valores actuales por defecto. Desde VeloVision se pasan ampliadas por el error del video (altura ±max(0.35, rel_height_sys_err_ft), slot ±max(6, error de slot)) y la UI del Sculptor las muestra como "tolerancias ampliadas por el error del video". No es una relajación silenciosa: `INSUFFICIENT_PEERS` se mantiene y su mensaje explica qué filtro dejó fuera a los pares.
+#### Revisión de los ajustes por video real (CAMBIOS REQUERIDOS)
+Revisor independiente, 2026-10-21. No se modificó código ni el estado global de `HACK-017`. Los puntos 1-5 y 7 están correctos; el punto 6 es una falla de producto que debe corregirse antes de aprobar.
+- **Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_vision_core.py tests/test_prospect_card.py tests/test_sculptor.py tests/test_velovision_ui.py tests/test_vision_plausibility.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py` -> `132 passed in 36.42s`, exit 0.
+- **Alcance:** OK. El diff solo toca `src/vision/pose_slot.py`, `src/vision/prospect_card.py`, `src/sculptor/optimizer.py`, `dashboard/velovision_tab.py`, `dashboard/sculptor_tab.py` y tests; `dashboard/components.py` no cambió. Los clips viven en `data/vision_clips/` (ignorado por `.gitignore:15`); ningún archivo versionado ni test los nombra (solo `docs/TASKS.md:925` menciona "iStock" en prosa).
+- **Sculptor (HACK-016): OK.**
+  - Con `tolerances=None` hay 0 diferencias frente a HEAD: se compararon 360 combinaciones (mano x slot x altura x velocidad x pitch_id) contra `git archive HEAD` de `src/sculptor`, incluidos `status`, `n_peers`, `filters`, referencias y rangos. Solo cambia, por diseño, el texto de `reason` en `INSUFFICIENT_PEERS` y las claves nuevas.
+  - Las ampliadas se declaran siempre: `tolerances_used` y `tolerance_source` (`optimizer.py:155-163`), el texto de `reason` incluye la etiqueta de origen, y la UI las muestra (`sculptor_tab.py:91-94`). `resolve_tolerances` rechaza claves desconocidas y valores no positivos.
+  - `INSUFFICIENT_PEERS` sigue sin cifras: `delta_gain_reason` = "Sin pares suficientes: no se emite diferencia." y no hay referencias ni rango.
+  - **Mensaje "altura ±0.35 ft" con ±0.40: no es un bug.** Con `tolerances={"RelHeight": 0.40}` el mensaje dice "altura ±0.40 ft" (verificado con RelHeight 7.2, 7.5 y 7.8). El ±0.35 que vio el Worker corresponde a la corrida estándar (`r0`) del script, que imprime el mensaje de `r0` y no el de `r1`.
+  - Etiquetas literales intactas (el Sculptor no cambió sus textos de coaching ni de métricas).
+- **Puerta: OK.** Umbrales documentados como supuestos de diseño calibrados con clips locales (`pose_slot.py:112-122`); `quality_ok` exige `not blocking` (`pose_slot.py:586-587`) y la UI lo exige de nuevo (`velovision_tab.py:499-500`). Con los clips reales, `run_clips.py after` reproduce la tabla del Worker: `prueba_A_recorte` 0.998, ok, 7.80 ft, slot 57.1, fuera de la LMB por altura (máx. ~6.99), 0 pares en ambas corridas, filtro responsable "altura"; `2217809086` (pequeño, perfil) bloqueado por sujeto 22 % y perfil, ya no pasa; `2211096695` bloqueado por perfil y landmarks, sin medida; `1328698017` (6 s) pasa con 0.965 y 75 pares (ver punto 6).
+- **Plausibilidad: OK con matices.** Cifras salen del catálogo (percentiles p0.5/p99.5 por pitcher-año de la misma mano), no hay números fijos. `rel_side_ft` queda "sin referencia" de forma honesta y no cuenta como fuera. Matices no bloqueantes:
+  1. `prospect_card.py:293` y `:297` dicen "por encima/por debajo de cualquier lanzador LMB (máx./mín. ~X)", pero X es p99.5/p0.5, no el máximo real. Cambiar a "fuera del rango habitual de la LMB (p99.5 ~X)".
+  2. `velovision_tab.py:333` agrega "." tras un texto que ya termina en ".", y sale ".." en la nota de `rel_side_ft`.
+  3. La casilla `vv_ack_outside_{digest}` (`velovision_tab.py:412`) es por video, no por frame: confirmar en un frame vale para otro frame que también cae fuera. Incluir el frame en la clave.
+- **Honestidad: OK.** `REFERENCE_NOTE` es el texto literal (`prospect_card.py:231`) y se muestra en la ficha (`velovision_tab.py:384`). Nada sugiere que la ficha sea el nivel del prospecto.
+
+##### Punto 6 — CONFIRMADO: se mide un frame que no es la soltura (falla de producto)
+`istockphoto-1328698017-640_adpp_is.mp4` dura 16.04 s (385 frames, 24 fps). Medido con `detect_release_frame` y confirmado mirando los frames:
+
+| Ventana | Frame elegido | Confianza | Pico (score) | Muñeca por delante del hombro | Resultado |
+|---|---|---|---|---|---|
+| App (6 s, `MAX_SECONDS`, `velovision_tab.py:32`) | 139 (5.79 s) | **0.06** | **0.02** (ruido) | 0 % de los frames; nunca sobre el hombro | calidad 0.965, `quality_ok`, 5.35 ft, slot 26.4°, **75 pares** |
+| Clip completo (20 s) | 329 (13.71 s) | 0.39 | 6.19 | 21 % | calidad 0.998, 7.82 ft, slot 82°; la plausibilidad lo marca "fuera" |
+
+- El frame 139 es el **inicio del movimiento** (manos juntas, pierna abajo). El frame 329 es la **soltura real** (la pelota sale de la mano). Otro candidato, el 232 (9.67 s), es la patada de pierna; por eso la estimación "~10 s" del Orquestador corresponde a la patada, no a la soltura, que ocurre hacia los ~13.7 s.
+- La app solo analiza los primeros 6 s (`velovision_tab.py:121`) y el detector sugiere un frame con confianza 0.06 y pico 0.02. La UI solo muestra la confianza como texto (`velovision_tab.py:488-489`); no bloquea ni avisa. La puerta de calidad no lo ve porque mide visibilidad, tamaño y vista, no si hay soltura. El usuario que pulse "Confirmar" obtiene una ficha y pares del Sculptor basados en un frame de preparación.
+- Calibración con los 4 clips: los frames válidos tienen pico 3.57-12.83 y confianza 0.39-0.70; el inválido, pico 0.02 y confianza 0.06. La separación es de más de 2 órdenes de magnitud en el pico. Son 4 clips: el umbral sería un supuesto de diseño.
+
+**Corrección mínima propuesta (no implementada):**
+1. `src/vision/pose_slot.py`: `detect_release_frame` devuelve además `peak_score`, `wrist_ahead` y `valid` (p. ej. `valid = peak_score >= RELEASE_PEAK_MIN (~1.0) and wrist_ahead_at_peak`); documentar el umbral como supuesto. `valid = False` también si la muñeca nunca pasa por delante del hombro en toda la ventana. Opcional: `measure_release` agrega un motivo a `blocking_issues`/`quality_issues` cuando el frame medido tiene `wrist_ahead` falso (muñeca por detrás del hombro).
+2. `dashboard/velovision_tab.py`: si `det["valid"]` es falso, mostrar una advertencia fuerte ("No se detectó una soltura en estos segundos; el frame sugerido es probablemente la preparación") y exigir una casilla de confirmación específica antes de generar la ficha o enviar al Sculptor. Añadir un control "Segundo de inicio" (`st.number_input`/slider) que re-extrae la ventana de 6 s desde ese segundo; `extract_pose_sequence` necesita el parámetro `start_seconds` (`pose_slot.py`, `cap.set(CAP_PROP_POS_MSEC)`), y el digest/clave de caché debe incluirlo.
+3. `tests/test_vision_core.py` y `tests/test_velovision_ui.py`: secuencia sintética sin movimiento de lanzamiento -> `valid False`; con lanzamiento -> `True`; UI sin `valid` no habilita el envío sin la casilla.
+4. Opcional para el aviso del usuario: si el video dura más que `MAX_SECONDS`, decirlo en la UI ("se analizan solo 6 s desde el segundo N de 16").
+
+**Estado:** `CAMBIOS_REQUERIDOS` solo por el punto 6 (más los 3 matices menores, no bloqueantes). El estado global de `HACK-017` no se tocó.
+##### Re-revisión: APROBADA (2026-10-21)
+- **Verify real:** mismo comando de 7 archivos -> `142 passed in 40.72s`, exit 0.
+- **Punto 6 resuelto.** `detect_release_frame` devuelve `peak_score`, `wrist_ahead` y `valid` (`pose_slot.py:121-128` y el retorno de la función); `RELEASE_PEAK_MIN = 1.0` está documentado como supuesto calibrado con 4 clips. `extract_pose_sequence(start_seconds=...)` y `PoseSequence.start_seconds/total_seconds` existen. Corrida real del clip de 16 s (`istockphoto-1328698017`): inicio 0 s -> frame 139, confianza 0.06, pico 0.02, muñeca por delante False, `valid` **False**; inicio 10 s -> frame a 13.71 s, confianza 0.71, pico 6.12, `valid` **True** (calidad 0.998, 7.82 ft; la plausibilidad sigue marcando la altura fuera de la LMB, que es lo correcto). Los otros 3 clips siguen `valid` True (picos 3.57, 6.40 y 12.83). La UI agrega "Segundo de inicio", el aviso "se analizan X s de Y" (`velovision_tab.py:519-520`), el callout y la casilla obligatoria `vv_ack_release` (`velovision_tab.py:540-543`), y la ficha/envío no se generan sin ella (`velovision_tab.py:566-569`). El digest incluye el segundo de inicio, así que las confirmaciones no se cruzan entre tramos.
+- **Matices menores:** el texto ahora dice "p99.5 de la LMB" y se quitó el ".." (`velovision_tab.py:376` usa `rstrip(".")`). **Matiz 3 (casilla por video, no por frame): basta, no bloquea.** El envío exige además la confirmación explícita del frame (`confirmed_frame == sel`), y la plausibilidad del frame actual se muestra junto a la casilla. Mejora opcional futura: incluir el frame en la clave de `vv_ack_outside_`.
+- **Salto de pestaña: APROBADO.** Probado en el navegador con la app real (puerto 8599, ya cerrado): en Sculptor, "Llevar referencia al Simulador" pasó a la pestaña Simulador, mostró el toast "Pitcheo cargado en Simulador" y la pastilla "Cargado desde Sculptor"; las 6 pestañas siguen presentes y funcionales; al cambiar a otra pestaña y forzar un rerun no vuelve a saltar.
+  - *JS seguro:* `tab_jump_js` (`components.py`, `tab_jump_js`) solo busca `[role="tab"]` por texto exacto y hace `click()` y `scrollTo(0,0)`; no lee ni envía datos, no hace red; el texto entra con `json.dumps` desde constantes internas ("Simulador", "Sculptor"), sin datos del usuario ni del video. Falla en silencio con `try/catch` y reintenta máx. 20 veces x 150 ms.
+  - *One-shot:* `switch_to_tab` marca `done = True` en `session_state` antes de inyectar, y `consume_tab_jump` se llama una vez por rerun en `app.py:541`; la pastilla es de solo lectura y depende del contexto vigente (`vv_override`/`source_mode`).
+  - *Alcance:* los cambios en `app.py` (líneas 541 y 543) y `leaderboard_tab.py:136` solo llaman al helper, como se autorizó. Sin saltos hacia pestañas inexistentes: la búsqueda por texto simplemente no encuentra nada.
+  - *Nota no bloqueante:* `json.dumps` no escapa `</script>`; hoy no importa porque las etiquetas son constantes, pero si algún día vienen de datos conviene escapar `<`.
+- **Procesos:** el servidor Streamlit de prueba (PIDs 12080 y 45528) se cerró y el puerto 8599 quedó sin escucha. No se modificó código ni el estado global.
+
+**Estado tras la re-revisión:** APROBADA. Pendiente del Orquestador cambiar el estado global.
+
 ### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
 - **State:** `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
 - **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
