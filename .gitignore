@@ -29,3 +29,12 @@ models/*.bin
 .vscode/
 *.log
 .DS_Store
+
+# LaTeX build files
+docs/latex/*.aux
+docs/latex/*.log
+docs/latex/*.out
+docs/latex/*.toc
+docs/latex/*.synctex.gz
+docs/latex/*.fls
+docs/latex/*.fdb_latexmk

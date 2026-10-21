@@ -1,0 +1,184 @@
+\documentclass[10pt]{article}
+\input{preambulo.tex}
+
+\title{\textbf{Diablos AeroVision}\\[4pt]
+\large Calidad de pitcheo ajustada por entorno en la LMB:\\ \splus, \lplus\ y \pplus\ a nivel del mar y en el Harp Helú}
+\author{Documento técnico · Reto 2 Diablos Rojos · ISAC Sports Analytics Hackathon 2026}
+\date{22 de octubre de 2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+\noindent
+Construimos tres métricas de calidad de pitcheo para la LMB en escala $100 + 10z$: \splus\ (física del lanzamiento y arsenal, sin ubicación ni conteo), \lplus\ (comando) y \pplus\ (combinado), cada una en un sabor \emph{neutral} (densidad de aire a nivel del mar) y un sabor \emph{CDMX} ($\rhohat=\cf{rho.cdmx}$, mediana de los pitcheos de \emph{Extreme Altitude} 2024--2025). Con \cf{datos.pitcheos} pitcheos de 2024--2026 estimamos una densidad del aire continua por juego a partir del arrastre, una identidad de pitcheo que no cambia con la altitud y un traductor físico que lleva cada lanzamiento de una densidad a otra conservando su residuo individual. En comparaciones dentro del mismo pitcher, la altitud reduce el quiebre total de todas las familias (\cf{h1.fourseam.tibabs}~in menos en la recta de cuatro costuras, \cf{h1.slider.tibabs}~in en el slider) y aumenta la velocidad de llegada. \pplus\ reduce la log-loss del baseline nulo entre \cf{val.pit.ll.min}\% y \cf{val.pit.ll.max}\% en los tres holdouts oficiales. \splus\ mejora de forma consistente los targets físicos (whiff \cf{val.stuff.whiff.min}--\cf{val.stuff.whiff.max}\%, rodado \cf{val.stuff.gb.min}--\cf{val.stuff.gb.max}\%), pero casi no añade poder predictivo sobre el valor en carreras de un lanzamiento aislado; lo discutimos abiertamente en la Sección~\ref{sec:val}.
+\end{abstract}
+
+%=====================================================================
+\section{Marco teórico: por qué la altitud cambia el pitcheo}
+\label{sec:teoria}
+
+Sobre una pelota en vuelo actúan tres fuerzas: la gravedad, el arrastre y la fuerza de sustentación por giro (Magnus, más la estela desplazada por la costura, \emph{seam-shifted wake}). Las dos aerodinámicas escalan con la densidad del aire,
+\[
+F_D = \tfrac12\, C_D\, \rho\, A\, v^2, \qquad F_M = \tfrac12\, C_L(S)\, \rho\, A\, v^2,
+\]
+donde $A$ es el área transversal, $v$ la velocidad y $C_L$ depende del factor de giro $S = r\omega/v$. La gravedad no depende de $\rho$. A 2{,}240~m la atmósfera estándar da $\rho/\rho_0 \approx 0.80$; la densidad efectiva de cada juego varía además con temperatura y humedad. Nuestra $\rhohat$ se mide relativa a la mediana de los juegos \emph{No Altitude} (que no están exactamente al nivel del mar) y la categoría \emph{Extreme} mezcla varios parques, por eso su mediana (\cf{rho.cdmx}) queda por encima del valor teórico del Harp Helú. De ahí salen tres predicciones físicas:
+
+\begin{enumerate}
+  \item \textbf{Menos movimiento inducido.} Con menor $\rho$, $F_M$ cae en la misma proporción: la recta pierde \emph{ride}, el sinker pierde corrida y la curva pierde caída inducida por giro (su IVB, negativo, se acerca a cero).
+  \item \textbf{Más velocidad en el plato.} Con menor $F_D$ la pelota frena menos: \texttt{ZoneSpeed} sube y el bateador tiene menos tiempo. Es un efecto compensatorio que hay que medir, no suponer.
+  \item \textbf{La bola bateada vuela más.} El mismo menor arrastre actúa sobre la pelota bateada (\emph{canal parque}), así que un mismo contacto produce más daño. Este efecto no es culpa del pitcheo y no debe castigar al \splus.
+\end{enumerate}
+
+Las bases del reto plantean cuatro hipótesis que \textbf{probamos con datos LMB en lugar de suponerlas}: H1, los pitcheos que viven de movimiento aerodinámico pierden más; H2, los que viven de gravedad y diferencial de velocidad (cambio, splitter) son más resilientes; H3, en altitud valen más los rodados; H4, la eficiencia de giro y el movimiento observado importan más que el spin bruto. Los resultados están en la Sección~\ref{sec:altitud}.
+
+%=====================================================================
+\section{Datos y sustitutos de columnas ausentes}
+\label{sec:datos}
+
+El conjunto de ISAC contiene \cf{datos.pitcheos} pitcheos TrackMan en \cf{datos.juegos} juegos y \cf{datos.pitchers} pitchers anónimos (2024--2026). La categoría de altitud divide los lanzamientos en \emph{No Altitude} (\cf{rho.no.pitcheos}), \emph{Medium} (\cf{rho.med.pitcheos}) y \emph{Extreme} (\cf{rho.ext.pitcheos}). Varias columnas que el reto menciona no existen; las sustituimos así:
+
+\begin{description}[leftmargin=0pt]
+  \item[Altitud y estadio $\to$ densidad continua $\rhohat$.] Estimamos la densidad efectiva de cada juego \emph{solo con cinemática de arrastre} (desaceleración \texttt{ay0}, \texttt{SpeedDrop}, \texttt{ZoneTime}), nunca con el quiebre, para no crear circularidad con H1. Normalizamos por la mediana de los juegos \emph{No Altitude} y suavizamos los juegos con pocas rectas mediante Bayes empírico ($m=30$), encogiendo cada juego hacia la mediana de \emph{su propia} categoría de altitud; ese prior usa la etiqueta de categoría, así que $\rhohat$ no es independiente de ella. La Tabla~\ref{tab:densidad} muestra que las \emph{medianas} se separan con claridad (de \cf{rho.no.min} a \cf{rho.no.max} en \emph{No Altitude}; de \cf{rho.ext.min} a \cf{rho.ext.max} en \emph{Extreme}), pero los juegos individuales se traslapan: el p90 de \emph{Extreme} llega a \cf{rho.ext.p90max}, por encima del p10 de \emph{Medium} (\cf{rho.med.p10min}). Usamos $\rhohat_{\text{CDMX}}=\cf{rho.cdmx}$, mediana por pitcheo de las filas \emph{Extreme} de 2024--2025 (las de entrenamiento); esta categoría mezcla varios parques, así que el sabor CDMX es una aproximación al Harp Helú, no una medición exclusiva de él.
+  \item[\texttt{AutoPitchType} $\to$ \texttt{pitch\_id} invariante.] El clasificador automático etiqueta por movimiento, y el movimiento cambia con la altitud: en \emph{Extreme} reetiqueta cambios como otra cosa (\cf{relabel.ch.auto}~pp de uso) y \emph{crea} cutters (\cf{relabel.fc.auto}~pp). Comparar familias con esa etiqueta confundiría el efecto físico con un cambio de nombre. Construimos \texttt{pitch\_id} por pitcher con variables que la densidad no altera (velocidad, eje y tasa de giro, punto de soltura). Con \texttt{pitch\_id}, la diferencia de uso del cutter casi desaparece (\cf{relabel.fc.inv}~pp) y la del cambio baja a \cf{relabel.ch.inv}~pp; la del slider queda en \cf{relabel.sl.inv}~pp. Esas diferencias residuales son cambios reales de uso entre entornos, no reetiquetado (Tabla~\ref{tab:reetiquetado}).
+  \item[24 estados base-out $\to$ outs $\times$ conteo.] No hay corredores en los datos. El valor en carreras \texttt{xrv\_pitcher} se calibra empíricamente con la LMB 2024--2025 (\texttt{RunsScored}, \texttt{OutsOnPlay}) sobre el estado reducido outs $\times$ conteo, sin constantes importadas de MLB.
+  \item[Secuencia y túnel.] \texttt{prev\_pitch\_id} se toma del pitcheo anterior en la misma aparición. Medimos dos túneles respecto de la recta principal del pitcher: distancia en el punto de soltura y separación a 170~ms de vuelo.
+\end{description}
+
+\begin{table}[htbp]\centering\small
+\caption{Densidad estimada $\rhohat$ por categoría de altitud y temporada.}\label{tab:densidad}
+\tabla{tab_densidad}
+\end{table}
+
+\begin{table}[htbp]\centering\small
+\caption{Cambio en el porcentaje de uso de cada familia en \emph{Extreme} frente a \emph{No Altitude}: etiqueta automática contra \texttt{pitch\_id} invariante.}\label{tab:reetiquetado}
+\tabla{tab_reetiquetado}
+\end{table}
+
+%=====================================================================
+\section{Arquitectura de modelos y definición de la escala}
+\label{sec:modelos}
+
+\paragraph{Etapa A: traductor físico de movimiento.} Un conjunto de modelos LightGBM aprende, \emph{dentro de cada pitcher}, cómo cambian \texttt{InducedVertBreak}, \texttt{HorzBreak} y \texttt{ZoneSpeed} con $\rhohat$. Impone restricciones monótonas físicas: la magnitud del quiebre crece con $\rho$ y la velocidad de llegada decrece con $\rho$. Para llevar un lanzamiento a otra densidad $\rho^*$ se conserva su residuo individual,
+\[
+\text{IVB}(\rho^*) = \text{IVB}_{\text{obs}} + \big[\widehat{\text{IVB}}(X,\rho^*) - \widehat{\text{IVB}}(X,\rho_{\text{obs}})\big],
+\]
+de modo que traducir a la propia densidad devuelve exactamente el valor observado.
+
+\paragraph{\splus.} Usa solo física del lanzamiento: velocidad, giro y eje, soltura, extensión, quiebre, ángulo de brazo y mano; más el arsenal relacional (diferenciales de velocidad y movimiento frente a la recta, túnel en la soltura y porcentaje de uso). Excluye por construcción la ubicación en el plato, el conteo, el bateador, la secuencia, los ángulos de llegada y $\rhohat$. También excluye los ángulos de soltura y el túnel a 170~ms, porque junto con la física permitían reconstruir la ubicación. Una auditoría de fuga mide cuánto de la altura en el plato pueden reconstruir, fuera de muestra, las variables de \splus: $R^2=\cf{diag.loc.r2oos}$ frente a $\cf{diag.loc.r2ref}$ de una referencia con solo las variables de velocidad y el tipo de pitcheo, un exceso de \cf{diag.loc.excess}, dentro del criterio de aceptación de $0.20$ fijado en la tarea de Stuff+ (con los ángulos de soltura el $R^2$ era casi 1).
+
+El modelo se entrena solo con lanzamientos \emph{No Altitude} de 2024--2025, para que el \emph{carry} del parque no contamine el canal Stuff. El conteo entra solo como \emph{offset}: un baseline por conteo predice cada resultado y ocho regresores LightGBM aprenden el residuo físico de los ocho targets de las bases (whiff, chase, strike cantado, rodado, contacto débil, contacto duro, out en el pitcheo y \texttt{xrv\_pitcher}). Los hiperparámetros se eligen por validación cruzada agrupada por pitcher (\cf{stuff.lgbm}). Un meta-regresor Ridge con coeficientes no negativos ($\alpha=\cf{stuff.alpha}$), ajustado sobre predicciones fuera de pliegue, combina los ocho residuos en una sola predicción de valor en carreras.
+
+\paragraph{\lplus\ y \pplus.} \lplus\ usa solo geometría de plato y zona, conteo, lateralidad y \texttt{pitch\_id}, sin ninguna variable física; por eso es idéntico en ambos sabores. \pplus\ une las variables de \splus\ y \lplus\ más túneles y contexto (el conteo entra como variable, no como \emph{offset}). Su arquitectura es más simple que la de \splus: siete clasificadores y un regresor LightGBM ajustados directamente sobre los ocho targets, combinados por un Ridge ($\alpha=1$) sin restricción de signo, ajustado dentro de muestra (sin predicciones fuera de pliegue) y entrenado con todas las altitudes de 2024--2025. Por eso sus etiquetas incluyen el \emph{carry} de los parques en altitud, a diferencia de \splus.
+
+\paragraph{Escala y sabores.} Para cada modelo,
+\[
+\text{Score+} = 100 + 10\cdot\frac{\hat y - \mu_{\text{neutral}}}{\sigma_{\text{neutral}}},
+\]
+donde $\hat y$ es la predicción del meta-regresor en carreras desde la perspectiva del pitcher (mayor es mejor): en \lplus\ y \pplus\ es el valor esperado del pitcheo; en \splus\ es el \emph{residuo} esperado sobre el baseline de conteo. $(\mu,\sigma)$ se calibran con la referencia LMB evaluada a $\rho=1.000$. El \textbf{sabor neutral} traduce cada lanzamiento a $\rho=1$ con la Etapa A; el \textbf{sabor CDMX} lo traduce a $\rhohat=\cf{rho.cdmx}$ y reconstruye los diferenciales de arsenal a esa densidad. Ambos sabores comparten $(\mu_{\text{neutral}},\sigma_{\text{neutral}})$, de modo que $\Delta\splus_{\text{CDMX}} = \splus_{\text{CDMX}} - \splus_{\text{neutral}}$ se lee directamente en puntos. Con $\sigma_{\text{neutral}}=\cf{escala.stuff.sigma}$, un punto de \splus\ equivale a \cf{escala.stuff.punto} carreras por pitcheo; en \pplus\ $\sigma=\cf{escala.pit.sigma}$. Esa diferencia de escala ya anticipa el resultado de la sección siguiente: la física aislada mueve poco el valor en carreras de un lanzamiento individual.
+
+%=====================================================================
+\section{Validación fuera de muestra}
+\label{sec:val}
+
+Evaluamos tres particiones oficiales contra el \textbf{baseline nulo}, que asigna a cada pitcheo el valor medio de su conteo:
+\begin{itemize}
+  \item \textbf{Pitcher:} cinco folds agrupados por pitcher en 2024--2025, sin ningún pitcher compartido entre entrenamiento y prueba.
+  \item \textbf{Temporada:} entrenamiento en 2024--2025 y prueba en 2026.
+  \item \textbf{Parque:} entrenamiento en \emph{No} y \emph{Medium Altitude}, prueba en \emph{Extreme Altitude}. Es la prueba más exigente para un modelo de altitud.
+\end{itemize}
+
+\begin{table}[htbp]\centering\small
+\caption{Métricas fuera de muestra (los folds de pitcher se promedian). RMSE y correlación de Pearson contra el \texttt{xrv\_pitcher} observado; LL = log-loss del target binario. Menor RMSE/LL y mayor $r$ es mejor.}\label{tab:holdouts}
+\tabla{tab_holdouts}
+\end{table}
+
+\paragraph{\pplus\ y \lplus.} \pplus\ supera al baseline en todos los targets y todos los holdouts (Tabla~\ref{tab:logloss}). Su correlación con el valor observado es de \cf{val.sea.pit.r} en 2026 frente a \cf{val.sea.base.r} del baseline, y se mantiene en \cf{val.park.pit.r} al probarlo en parques de altitud extrema que nunca vio. \lplus\ capta casi toda esa ganancia (\cf{val.sea.loc.r}): la ubicación realizada y el conteo explican la mayor parte del valor de un pitcheo aislado, en buena medida de forma mecánica (una pelota fuera de zona es casi siempre bola). Dos submodelos de \lplus\ quedan \emph{por debajo} del baseline en los tres holdouts: rodado (entre \cf{val.loc.gb.mejor}\% y \cf{val.loc.gb.peor}\% más log-loss) y out en el pitcheo (entre \cf{val.loc.oop.min}\% y \cf{val.loc.oop.max}\% más). Un modelo sin información empataría con el baseline, así que una pérdida de ese tamaño indica mala calibración o sobreajuste de esos submodelos, no solo falta de señal. \pplus\ no tiene ese problema, y es el que recomendamos.
+
+\paragraph{\splus: lo que mide y lo que no.} Reportamos el resultado sin maquillaje: en valor en carreras por pitcheo, \splus\ prácticamente empata con el baseline (en 2026, $r=\cf{val.sea.stuff.r}$ contra $\cf{val.sea.base.r}$; RMSE \cf{val.sea.stuff.rmse} contra \cf{val.sea.base.rmse}). Esto es consecuencia del diseño, no un error:
+\begin{enumerate}
+  \item \splus\ \emph{no ve la ubicación ni el conteo}. Por construcción aprende solo el incremento físico sobre el baseline de conteo, y el resultado de un pitcheo aislado depende sobre todo de dónde cae y en qué cuenta. Por eso $\sigma_{\text{neutral}}$ de \splus\ es \cf{escala.stuff.sigma} carreras, contra \cf{escala.pit.sigma} de \pplus.
+  \item Donde la física sí manda, \splus\ mejora al baseline \textbf{en los tres holdouts}: reduce la log-loss de whiff entre \cf{val.stuff.whiff.min} y \cf{val.stuff.whiff.max}\% y la de rodado entre \cf{val.stuff.gb.min} y \cf{val.stuff.gb.max}\%, y gana en \cf{val.stuff.ganados} de \cf{val.stuff.total} combinaciones target--holdout. La excepción es el strike cantado, que es pura ubicación.
+  \item La señal de \splus\ es estable: agregada por pitcher, su correlación entre 2024 y 2025 es $r=\cf{stab.stuff.r}$, mayor que la de \lplus\ (\cf{stab.loc.r}) y \pplus\ (\cf{stab.pit.r}), con $n=\cf{stab.n}$ pitchers. Es una medida \emph{dentro de muestra}, porque ambos años se usaron para entrenar; el análisis fuera de muestra entre 2025 y 2026 queda como trabajo pendiente.
+\end{enumerate}
+En resumen, \splus\ es un \textbf{descriptor estable de la calidad física} del pitcheo, útil para scouting y para aislar el efecto de la altitud, \textbf{no un predictor del resultado de un lanzamiento aislado}. Para pronosticar carreras recomendamos \pplus.
+
+\begin{table}[htbp]\centering\small
+\caption{Reducción relativa de log-loss frente al baseline nulo, por target y holdout (positivo = mejor).}\label{tab:logloss}
+\tabla{tab_mejora_logloss}
+\end{table}
+
+\paragraph{Calibración.} Por deciles de predicción, la diferencia absoluta media entre el valor predicho y el observado es de milésimas de carrera, salvo \splus\ en el holdout de parque (\cf{cal.stuff.park.mean}, Tabla~\ref{tab:cal}); la mayor diferencia en cualquier decil y holdout es \cf{cal.max.global}. \pplus\ es el mejor calibrado en el holdout de parque.
+
+\begin{table}[htbp]\centering\small
+\caption{Error de calibración por deciles (carreras por pitcheo): media y máximo de $|\bar y_{\text{pred}}-\bar y_{\text{obs}}|$.}\label{tab:cal}
+\tabla{tab_calibracion}
+\end{table}
+
+%=====================================================================
+\section{Evidencia empírica de altitud: H1--H4 y canales}
+\label{sec:altitud}
+
+Todas las comparaciones son \textbf{dentro del mismo pitcher}: para cada pitcher, temporada y \texttt{pitch\_id} que lanzó tanto en \emph{No} como en \emph{Extreme Altitude}, restamos las medias y luego promediamos las diferencias entre pitchers. Los intervalos de confianza salen de un bootstrap por pitcher de 1{,}000 réplicas, para no tratar como independientes los lanzamientos de un mismo pitcher.
+
+\paragraph{H1, movimiento aerodinámico: confirmada para las rectas, parcial en el resto.} Todas las familias pierden quiebre total en altitud (Tabla~\ref{tab:h1}), y las rectas están entre las que más pierden, como predice H1. Pero H1 es diferencial y no se cumple en todo su enunciado: el slider, que vive del giro, es el más resistente, y el cambio pierde casi tanto como la recta. Las que más pierden son el sinker (\cf{h1.sinker.tib}~in), la recta de cuatro costuras (\cf{h1.fourseam.tib}~in) y el cambio (\cf{h1.changeup.tib}~in); el slider es el más resistente (\cf{h1.slider.tib}~in). El efecto compensatorio también aparece: la recta llega \cf{h1.fourseam.zs}~mph más rápido. El splitter es el único caso sin evidencia sólida en IVB ($p=\cf{h1.splitter.ivbp}$, $n=\cf{h1.splitter.n}$ pitchers).
+
+\begin{table}[htbp]\centering\small
+\caption{H1: diferencia \emph{Extreme} $-$ \emph{No Altitude} dentro de cada pitcher. IVB y HB en pulgadas; todas con $p<0.01$ salvo el IVB y la ZoneSpeed del splitter.}\label{tab:h1}
+\tabla{tab_h1}
+\end{table}
+
+\begin{figure}[htbp]\centering
+\includegraphics[width=\linewidth]{generated/fig_h1.pdf}
+\caption{Izquierda: pérdida de quiebre total observada dentro del mismo pitcher. Derecha: cambio de \splus\ que predice el modelo al llevar cada pitcheo de la LMB a la densidad de la CDMX. Coinciden en los extremos (rectas castigadas, slider resistente), no en el orden intermedio: el sinker y el cambio pierden casi tanto quiebre como la recta, pero el modelo les resta mucho menos \splus.}\label{fig:h1}
+\end{figure}
+
+El contrafactual del modelo coincide con lo observado solo en los extremos (Figura~\ref{fig:h1}). Al traducir cada pitcheo de la LMB de $\rho=1$ a $\rhohat_{\text{CDMX}}$, la recta pierde en promedio \cf{cf.fourseam.delta.abs} puntos de \splus\ y el sinker \cf{cf.sinker.delta.abs}, mientras que slider (\cf{cf.slider.delta}), cutter (\cf{cf.cutter.delta}) y curva (\cf{cf.curveball.delta}) casi no cambian (Tabla~\ref{tab:cf}). El orden intermedio no coincide: el sinker pierde más quiebre observado que la recta (\cf{h1.sinker.tib} frente a \cf{h1.fourseam.tib}~in), pero el modelo le resta menos de la mitad, y el cambio pierde \cf{h1.changeup.tibabs}~in con solo \cf{cf.changeup.delta} puntos. El modelo no valora igual cada pulgada de quiebre en todas las familias. En el leaderboard (\cf{lb.n} temporadas de pitcher con al menos \cf{lb.min} pitcheos), el $\Delta\splus_{\text{CDMX}}$ correlaciona $r=\cf{lb.corr.fsuso}$ con el uso de la recta de cuatro costuras.
+
+\begin{table}[htbp]\centering\small
+\caption{Contrafactual del modelo: \splus\ medio ponderado por pitcheos al traducir cada lanzamiento del sabor neutral al CDMX.}\label{tab:cf}
+\tabla{tab_contrafactual}
+\end{table}
+
+\paragraph{H2, resiliencia: consistente con el modelo, no con lo observado.} Definimos el grupo resiliente como cambio y splitter, y el aerodinámico como recta de cuatro costuras, curva y slider (el sinker y el cutter quedan fuera). Dentro del mismo pitcher, el contrafactual de \splus\ resta \cf{h2.est} puntos menos al grupo resiliente (IC 95\% \cf{h2.ci}, $n=\cf{h2.n}$). Pero los datos observados no respaldan H2 para el cambio: pierde \cf{h1.changeup.tibabs}~in de quiebre total, casi lo mismo que la recta, y su whiff cae \cf{h1.changeup.whiff.abs}~pp, la mayor caída significativa de todas las familias. Además, el slider, que pertenece al grupo aerodinámico, es el más resistente en las dos vistas. La frontera útil no es ``gravedad contra giro''.
+
+\paragraph{H3, valor de los rodados: no confirmada.} Entre \cf{h3.n} pitchers con muestra en ambos entornos, su tasa basal de rodados no predice cuánto valor pierden en altitud (pendiente \cf{h3.est}, IC \cf{h3.ci}, $p=\cf{h3.p}$) ni cuánto sube su tasa de HR ($p=\cf{h3.hr.p}$). La intuición física es razonable, pero con estos datos no podemos sostenerla.
+
+\paragraph{H4, forma frente a spin bruto: no confirmada.} En una regresión conjunta dentro de \emph{Extreme Altitude} ($n=\cf{h4.n}$ pitchers, bootstrap por pitcher), la única variable significativa para el valor en carreras es el \texttt{SpinRate} bruto ($p\cf{h4.xrv.spin.prel}$). La eficiencia de giro (\texttt{SpinToBreakRatio}, $p\cf{h4.xrv.s2b.prel}$) y el movimiento observado no lo son. Para whiff, \texttt{SpinRate} ($p\cf{h4.whiff.spin.prel}$) y \texttt{SpinToBreakRatio} ($p\cf{h4.whiff.s2b.prel}$) son significativos, pero el signo de la eficiencia es negativo. Es una regresión transversal entre pitchers dentro de \emph{Extreme}, sin comparación con \emph{No Altitude}: muestra que, en altitud, más spin se asocia con más valor, no que el spin proteja \emph{más} en altitud que al nivel del mar, ni que lo cause.
+
+\begin{table}[htbp]\centering\small
+\caption{H4: regresión conjunta en \emph{Extreme Altitude} con IC bootstrap por pitcher.}\label{tab:h4}
+\tabla{tab_h4}
+\end{table}
+
+\paragraph{Descomposición en canales.} Dentro de \cf{canal.n} pitchers, el valor por pitcheo cae \cf{canal.total.per100.abs} carreras por cada 100 lanzamientos en \emph{Extreme} (IC \cf{canal.total.ci} por pitcheo). Lo separamos en tres términos:
+\begin{itemize}
+  \item \textbf{Canal Stuff} (\cf{canal.stuff.share}\%, \cf{canal.stuff.per100} carreras por 100): contrafactual del propio modelo \splus\ en las mismas filas a dos densidades. Es lo que la altitud le quita al pitcheo.
+  \item \textbf{Canal parque} (\cf{canal.park.share}\%, \cf{canal.park.per100} carreras por 100): diferencia de valor en pelotas en juego condicionada a la velocidad y el ángulo de salida. Es la misma calidad de contacto, que en altitud produce más daño.
+  \item \textbf{Residuo no atribuido} (\cf{canal.unallocated.share}\%, \cf{canal.unallocated.per100} carreras por 100). No lo asignamos a ningún canal: incluye cambios de ubicación, de selección de pitcheos y de bateadores entre ambos entornos.
+\end{itemize}
+La lectura operativa: de lo que sí podemos atribuir, el canal parque es \cf{canal.ratio} veces mayor que la pérdida física de los pitcheos. Por eso el sabor CDMX de \splus\ solo descuenta el canal Stuff.
+
+%=====================================================================
+\section{Aplicabilidad y fronteras del modelo}
+\label{sec:aplicacion}
+
+\paragraph{Herramientas.} El \textbf{simulador} (Streamlit) recibe las características de un pitcheo, lo traduce a ambas densidades y muestra \splus, \lplus\ y \pplus\ lado a lado, la atribución SHAP y el mapa de movimiento. El \textbf{Pitch Sculptor} no inventa pitcheos: busca, entre pitchers reales con el mismo slot ($\pm\cf{sc.slot.tol}^\circ$), altura de soltura ($\pm\cf{sc.relh.tol}$~ft) y velocidad de recta ($\pm\cf{sc.velo.tol}$~mph), qué formas logran más \splus\ CDMX, y reporta el rango intercuartílico de las filas más cercanas de esa familia en mecánica. Si hay menos de cinco pares, no emite recomendación. \textbf{VeloVision} estima el slot de brazo desde video de bullpen y devuelve un \emph{rango} de \splus\ CDMX por familia, a partir de los pitchers del dataset con slot similar; nunca da un valor puntual.
+
+\paragraph{Fronteras y limitaciones (las declaramos antes de que nos las pregunten).}
+\begin{itemize}
+  \item \splus\ casi no predice el valor en carreras de un pitcheo aislado (Sección~\ref{sec:val}). Debe usarse como descriptor físico, no como pronóstico.
+  \item La estabilidad entre años reportada es dentro de muestra.
+  \item \emph{Extreme Altitude} mezcla varios parques: el sabor CDMX usa su mediana ($\rhohat=\cf{rho.cdmx}$), no una medición del Harp Helú.
+  \item El \cf{canal.unallocated.share}\% del efecto total queda sin atribuir, y el canal parque es un contraste condicionado, no un efecto causal.
+  \item H3 y H4 no se confirman, H1 se confirma solo para las rectas y H2 solo en el contrafactual del modelo.
+  \item No hay orientación de costura, así que la estela desplazada por la costura no es modelable. Tampoco hay corredores en base, así que el valor en carreras usa outs $\times$ conteo.
+  \item Las comparaciones dentro del mismo pitcher controlan la identidad del pitcher, pero no la selección del rival ni del bateador en cada parque.
+  \item VeloVision mide la altura de soltura desde el tobillo del pie de apoyo y no desde el nivel del campo como TrackMan. Ese sesgo de origen no está medido, y la validación con anotadores humanos no lo detecta porque ambos miden en el mismo video. Por eso entrega rangos amplios y debe considerarse experimental.
+  \item Los IDs son anónimos y no hay equipo en los datos, así que no podemos identificar el staff de Diablos. Las recomendaciones se expresan por perfil.
+\end{itemize}
+
+\paragraph{Reproducibilidad.} Todo el pipeline es determinista y está cubierto por pruebas automáticas. Todas las cifras de este documento se generan desde \texttt{reports/} con \texttt{analysis/build\_paper\_numbers.py}; ningún número está escrito a mano.
+
+\end{document}

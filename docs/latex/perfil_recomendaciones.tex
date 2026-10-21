@@ -1,0 +1,135 @@
+\documentclass[10pt]{article}
+\input{preambulo.tex}
+
+\title{\textbf{Diablos AeroVision}\\[4pt]
+\large Perfil físico ideal para el Harp Helú, recomendaciones operativas\\ y tres casos para la entrevista}
+\author{Entregables 2 y 3 · Reto 2 Diablos Rojos · ISAC Sports Analytics Hackathon 2026}
+\date{22 de octubre de 2026}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\caja{Resumen para el cuerpo técnico}{%
+\begin{itemize}[leftmargin=12pt]
+  \item En el aire de la CDMX \textbf{todos los pitcheos se mueven menos}. Dentro del mismo pitcher, la recta de cuatro costuras pierde \cf{h1.fourseam.tibabs}~in de quiebre total y el sinker \cf{h1.sinker.tibabs}~in; el slider solo \cf{h1.slider.tibabs}~in.
+  \item \textbf{El pitcheo que más valor pierde es la recta de cuatro costuras}: en promedio \cf{cf.fourseam.delta.abs} puntos de \splus\ al llevarla a la densidad de la CDMX. Slider (\cf{cf.slider.delta}), cutter (\cf{cf.cutter.delta}) y curva (\cf{cf.curveball.delta}) casi no cambian.
+  \item Los pitchers que usan la recta en al menos el \cf{lb.fsalto.umbral}\% de sus lanzamientos pierden en promedio \cf{lb.fsalto.delta.abs} puntos; los que la usan menos del \cf{lb.fsbajo.umbral}\%, \cf{lb.fsbajo.delta.abs}.
+  \item \textbf{La mayor parte del daño atribuible es del parque, no del pitcheo.} La bola bateada vuela más: es la misma calidad de contacto, que en altitud produce más daño. No hay que castigar a un pitcher por eso al evaluarlo.
+  \item \textbf{Cómo usarlo:} evaluar con \splus\ CDMX y su $\Delta$, no con \splus\ neutral; en casa, mover el uso hacia los pitcheos resistentes; rediseñar con el Pitch Sculptor solo dentro de lo que pitchers con la misma mecánica ya lanzan.
+\end{itemize}}
+
+%=====================================================================
+\section{Perfil físico y de arsenal ideal en el Harp Helú}
+
+El perfil se construye solo con lo que los datos LMB confirman (ver el documento técnico):
+
+\begin{enumerate}
+  \item \textbf{El arma principal no es la recta de cuatro costuras.} Es la familia con la mayor pérdida de \splus\ y una de las de mayor pérdida de quiebre (el sinker pierde algo más). En el leaderboard (\cf{lb.n} temporadas de pitcher con al menos \cf{lb.min} pitcheos), el uso de la recta de cuatro costuras correlaciona $r=\cf{lb.corr.fsuso}$ con el $\Delta\splus_{\text{CDMX}}$.
+  \item \textbf{Arsenal cargado a slider, cutter y curva.} Son las familias que conservan su \splus\ (Tabla~\ref{tab:cf}). El slider, además, es la familia que menos quiebre total pierde (\cf{h1.slider.tibabs}~in).
+  \item \textbf{Spin alto.} En \emph{Extreme Altitude}, de las cuatro variables de la regresión conjunta (spin, eficiencia de giro, IVB y HB), el \texttt{SpinRate} bruto es la única asociada con más valor por pitcheo ($p\cf{h4.xrv.spin.prel}$); para whiff también lo es ($p\cf{h4.whiff.spin.prel}$), junto con \texttt{SpinToBreakRatio} ($p\cf{h4.whiff.s2b.prel}$, con signo negativo). Es una asociación entre pitchers dentro de altitud, no un efecto causal ni una comparación con el nivel del mar.
+  \item \textbf{La velocidad no se pierde, se gana.} Con menos arrastre, la recta llega \cf{h1.fourseam.zs}~mph y el sinker \cf{h1.sinker.zs}~mph más rápido al plato. La velocidad es un activo en la CDMX, pero no compensa la pérdida de movimiento en el \splus.
+  \item \textbf{El cambio y el splitter no son la apuesta segura.} El modelo les resta \cf{h2.est} puntos menos que a la recta, la curva y el slider del mismo pitcher (H2), pero pierden más \splus\ que el cutter y la curva (\cf{cf.changeup.delta} y \cf{cf.splitter.delta} frente a \cf{cf.cutter.delta} y \cf{cf.curveball.delta}). En lo observado, el cambio pierde \cf{h1.changeup.tibabs}~in de quiebre, casi como la recta, y \cf{h1.changeup.whiff.abs}~pp de whiff, la mayor caída significativa.
+  \item \textbf{Ser pitcher de rodados no es, por sí solo, una ventaja demostrada.} La tasa basal de rodados no predice quién sufre menos en altitud ($p=\cf{h3.p}$, H3).
+\end{enumerate}
+
+\begin{table}[H]\centering\small
+\caption{Qué gana y qué pierde \splus\ en la CDMX por familia (contrafactual del modelo; media ponderada por pitcheos en toda la LMB).}\label{tab:cf}
+\tabla{tab_contrafactual}
+\end{table}
+
+%=====================================================================
+\section{Perfiles que ganan y perfiles que pierden}
+
+\paragraph{Ganan valor relativo:} los arsenales con poca dependencia de la recta de cuatro costuras, donde el slider, el cutter y la curva pesan más (Tabla~\ref{tab:cf}). De las \cf{lb.n} temporadas analizadas, solo \cf{lb.delta.pos} tienen $\Delta\splus_{\text{CDMX}}$ positivo (máximo \cf{lb.delta.max}). ``Ganar'' en la CDMX significa, en la práctica, \emph{no perder}, mientras la mediana de la liga pierde \cf{lb.delta.median.abs} puntos.
+
+\paragraph{Pierden valor:} la recta de cuatro costuras y el sinker, las dos familias con mayor pérdida de quiebre y de \splus. El caso extremo del leaderboard pierde \cf{lb.delta.min.abs} puntos.
+
+\paragraph{Riesgo de contacto duro y HR.} Dentro del mismo pitcher, la tasa de HR por pitcheo sube en altitud en \cf{riesgo.hr.suben} de las \cf{riesgo.hr.familias} familias, con \cf{riesgo.hr.signif} diferencias significativas al 5\% por separado (Tabla~\ref{tab:riesgo}). El daño por contacto sí aparece en conjunto: el canal parque resta \cf{canal.park.per100.abs} carreras por cada 100 pitcheos (IC por pitcheo \cf{canal.park.ci}) a igual velocidad y ángulo de salida. En contraste, la pérdida de whiff sí es clara en la recta (\cf{h1.fourseam.whiff}~pp), el cambio (\cf{h1.changeup.whiff}~pp), el sinker y el slider.
+
+\begin{table}[H]\centering\small
+\caption{Riesgo por familia en \emph{Extreme} frente a \emph{No Altitude} (dentro del mismo pitcher, en puntos porcentuales por pitcheo).}\label{tab:riesgo}
+\tabla{tab_riesgo}
+\end{table}
+
+%=====================================================================
+\section{Cómo perfilar a un prospecto o agente libre}
+
+\begin{enumerate}
+  \item \textbf{Con TrackMan:} cargar sus pitcheos en el simulador. Comparar el \splus\ neutral con el CDMX por pitcheo y revisar si su arsenal depende de la recta.
+  \item \textbf{Sin TrackMan (VeloVision, experimental):} grabar un bullpen de lado, marcar la escala y obtener el slot del brazo. La herramienta devuelve el \emph{rango} intercuartílico de \splus\ CDMX que logran los pitchers del dataset con ese slot. Un radar de mano puede estrechar el rango. No es un valor del prospecto: es la expectativa de su perfil mecánico, con un sesgo de medición aún no cuantificado.
+  \item \textbf{Rediseño (Pitch Sculptor):} buscar, entre pitchers reales con el mismo slot ($\pm\cf{sc.slot.tol}^\circ$), altura de soltura ($\pm\cf{sc.relh.tol}$~ft) y velocidad de recta ($\pm\cf{sc.velo.tol}$~mph), qué pitcheos y formas rinden más en la CDMX. Las diferencias son observadas frente a pares, no ganancias causales garantizadas.
+  \item \textbf{Decisión:} priorizar \pplus\ CDMX para pronosticar rendimiento y \splus\ CDMX junto con su $\Delta$ para entender \emph{por qué}. Cuando haya varias temporadas, revisar que el $\Delta$ se repita (no lo hemos medido de forma sistemática).
+\end{enumerate}
+
+\paragraph{Staff de Diablos.} Los datos no traen equipo ni estadio y los IDs son anónimos, así que no podemos identificar a los pitchers de Diablos. Las recomendaciones se expresan por perfil y aplican a cualquier pitcher que el club cargue en el simulador.
+
+%=====================================================================
+\section{Tres casos para la entrevista de 10 minutos}
+
+Los tres pitchers son reales (IDs anónimos del dataset). Los lugares ``de \cf{lb.n}'' ordenan pitcher-temporadas de 2024 a 2026 con al menos \cf{lb.min} pitcheos, no una liga de un solo año. Los scores de 2024--2025 son dentro de muestra (esas temporadas se usaron para entrenar); solo los de 2026 son fuera de muestra.
+
+%---------------------------------------------------------------------
+\subsection*{Caso A · Fichaje: el agente libre que las métricas neutrales subestiman}
+
+\textbf{Situación.} \cf{ca2.id}, \cf{ca2.mano}, \cf{ca2.velo}~mph de velocidad media, arsenal de slider (\cf{ca.slider.uso}\%) y cambio (\cf{ca.changeup.uso}\%). Su \splus\ neutral es modesto (\cf{ca2.sn} en \cf{ca2.year}; lugar \cf{ca2.rank.sn} de \cf{lb.n}). Un scout de nivel del mar lo descartaría.
+
+\textbf{Qué dice el modelo.}
+\begin{itemize}
+  \item No pierde nada en la CDMX: $\Delta\splus = \cf{ca1.sd}$ en \cf{ca1.year} y \cf{ca2.sd} en \cf{ca2.year}. Está entre los más resistentes de la liga (lugar \cf{ca1.rank.delta} y \cf{ca2.rank.delta} de \cf{lb.n}) dos años seguidos.
+  \item Su valor está en el comando: \lplus\ \cf{ca1.ln} y \cf{ca2.ln}; \pplus\ CDMX \cf{ca1.pc} y \cf{ca2.pc}, ambos por encima del promedio de la liga.
+  \item El slider pasa de \cf{ca.slider.sn} a \cf{ca.slider.sc} en la CDMX y el cambio de \cf{ca.changeup.sn} a \cf{ca.changeup.sc} (Tabla~\ref{tab:ca}). Además, \cf{ca2.gb}\% de sus pelotas en juego en \cf{ca2.year} fueron rodados, y su valor observado fue mejor en \emph{Extreme} que en \emph{No Altitude} (\cf{ca1.ct} y \cf{ca2.ct} carreras por 100 pitcheos).
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Caso A: arsenal \cf{ca2.year}.}\label{tab:ca}
+\tabla{tab_ca_arsenal}
+\end{table}
+
+\textbf{Decisión.} Fichar: es un perfil hecho para el Harp Helú, y un análisis con métricas neutrales lo subestima. \textbf{Riesgo:} su \splus\ absoluto es bajo; si pierde comando, no tiene la física para compensarlo.
+
+%---------------------------------------------------------------------
+\subsection*{Caso B · Alerta: la trampa del nivel del mar}
+
+\textbf{Situación.} \cf{cb.id}, \cf{cb.mano}, \cf{cb.velo}~mph. En \cf{cb.year} su \splus\ neutral es \cf{cb.sn}: lugar \cf{cb.rank.sn} de \cf{lb.n} (percentil \cf{cb.pctl}). En papel, un brazo élite.
+
+\textbf{Qué dice el modelo.}
+\begin{itemize}
+  \item En la CDMX baja a \cf{cb.sc} ($\Delta=\cf{cb.sd}$), el lugar \cf{cb.rank.delta} de \cf{lb.n} en resistencia a la altitud. \pplus\ pasa de \cf{cb.pn} a \cf{cb.pc}.
+  \item La causa es una: lanza la recta de cuatro costuras el \cf{cb.fourseam.uso}\% de las veces, y esa recta cae de \cf{cb.fourseam.sn} a \cf{cb.fourseam.sc}. Su slider casi no cambia (\cf{cb.slider.sn} $\to$ \cf{cb.slider.sc}).
+  \item \textbf{Lo que el modelo no dice:} en su propia muestra de \cf{cb.year}, su valor observado fue \emph{mejor} en \emph{Extreme} que en \emph{No Altitude} (\cf{cb.ct} carreras por 100 pitcheos). \splus\ describe la física de sus pitcheos, no ese resultado, que también depende de ubicación, rivales y azar. La alerta es sobre el riesgo físico de su arsenal, no una predicción de que vaya a fracasar.
+\end{itemize}
+
+\begin{table}[H]\centering\small
+\caption{Caso B: arsenal \cf{cb.year}.}\label{tab:cb}
+\tabla{tab_cb_arsenal}
+\end{table}
+
+\textbf{Decisión.} No pagar por su \splus\ neutral sin revisar su rendimiento observado en altitud. Si se contrata, que sea con un plan explícito: en casa, invertir la mezcla hacia el slider (\cf{cb.slider.uso}\% de uso actual). \textbf{Riesgo:} un slider usado mucho más podría perder efectividad; habría que vigilarlo en el simulador y en el juego.
+
+%---------------------------------------------------------------------
+\subsection*{Caso C · Rediseño con Pitch Sculptor y plan casa contra gira}
+
+\textbf{Situación.} \cf{cc.id}, \cf{cc.mano}, slot de \cf{cc.slot}$^\circ$, \cf{cc.velo}~mph. Su recta (\cf{cc.fourseam.uso}\% de uso) es promedio a nivel del mar (\cf{cc.fourseam.sn}) pero cae a \cf{cc.fourseam.sc} en la CDMX ($\Delta=\cf{cc.fourseam.sd}$). Su curva (\cf{cc.curveball.sn} $\to$ \cf{cc.curveball.sc}) y su cambio (\cf{cc.changeup.sn} $\to$ \cf{cc.changeup.sc}) son sus mejores pitcheos en ambos entornos. Dentro de su propia muestra, su valor observado en \emph{Extreme} es \cf{cc.canaltotal.abs} carreras por 100 pitcheos menor que en \emph{No Altitude}.
+
+\begin{table}[H]\centering\small
+\caption{Caso C: arsenal \cf{cc.year}.}\label{tab:cc}
+\tabla{tab_cc_arsenal}
+\end{table}
+
+\textbf{Qué dice el Pitch Sculptor.} Excluyéndolo a él del catálogo, encuentra \cf{sc.peers} pitchers reales con su misma mecánica. Las \cf{sc.fs.nrows} rectas (pitcher-temporada) más cercanas a la suya tienen un rango intercuartílico de \cf{sc.fs.p25}--\cf{sc.fs.p75} de \splus\ CDMX, y la mejor referencia factible llega a \cf{sc.fs.best} (\cf{sc.fs.gain} frente a la suya). La señal más fuerte está en el repertorio: \cf{sc.rep.slider.n} de esos pares lanzan slider, con mediana de \splus\ CDMX de \cf{sc.rep.slider}, y él no tiene slider (Tabla~\ref{tab:sc}).
+
+\begin{table}[H]\centering\small
+\caption{Caso C: qué lanzan los pares factibles y cuánto rinde en la CDMX.}\label{tab:sc}
+\tabla{tab_sculptor}
+\end{table}
+
+\textbf{Decisión.}
+\begin{itemize}
+  \item \textbf{En casa (Harp Helú):} bajar el uso de la recta y subir la curva, que no pierde valor ($\Delta=\cf{cc.curveball.sd}$), y el cambio, que pierde poco frente a la recta (\cf{cc.changeup.sd} contra \cf{cc.fourseam.sd}). La recta queda como pitcheo de establecimiento, no como arma de dos strikes.
+  \item \textbf{De gira (nivel del mar):} mantener la mezcla actual; ahí su recta rinde en el promedio de la liga.
+  \item \textbf{Proyecto de desarrollo:} incorporar un slider, el pitcheo con mejor \splus\ CDMX entre pitchers con su misma mecánica.
+\end{itemize}
+\textbf{Riesgo:} el Sculptor reporta diferencias observadas entre pares reales, no ganancias causales. Aprender un pitcheo nuevo puede no reproducir la forma de los pares.
+
+\end{document}

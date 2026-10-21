@@ -28,7 +28,7 @@
 | **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
 | **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores (`src/vision/`) |
-| **HACK-018** | S4 | P1 | `AVAILABLE` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/`) |
+| **HACK-018** | S4 | P1 | `APPROVED` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos en LaTeX: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/latex/`) |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
 | **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
 
@@ -960,7 +960,13 @@ Revisor independiente, 2026-10-21. El estado no pasa a `APPROVED` hasta registra
 
 
 ### `HACK-018` — Integración Final del Dashboard, Perfil Ideal, 3 Casos de Entrevista y Paper Técnico (`docs/`)
-- **State:** `AVAILABLE`
+- **State:** `APPROVED` (3.ª revisión independiente 2026-10-21). Antes: `REVIEW` (3a entrega 2026-10-21: punto 20 corregido en `perfil_recomendaciones.tex:129`). Antes: CHANGES_REQUESTED en 2.ª revisión. Antes: 2a entrega 2026-10-21 tras CHANGES_REQUESTED; ver Respuesta del Worker en Notas de Revisión. Entrega previa: (2026-10-21: PDF compilados con MiKTeX pdflatex sin errores ni cajas desbordadas: `documento_tecnico.pdf` 7 págs., `perfil_recomendaciones.pdf` 4 págs.; Verify `python -m pytest -q` -> 403 passed)
+- **Cambio de alcance (decisión del usuario, 2026-10-21):** los entregables se escriben en **LaTeX** en vez de Markdown, y Stuff+ se **reencuadra** como descriptor físico estable (no como predictor de xRV por pitcheo), reportando abiertamente que empata con el baseline en xRV. Para que "cifras = CSV" sea verificable, ninguna cifra se escribe a mano: `analysis/build_paper_numbers.py` lee `reports/` y genera `docs/latex/generated/` (macros `\cf{clave}` y tablas). `AllowedPaths` efectivos:
+  - `analysis/build_paper_numbers.py`
+  - `docs/latex/` (`preambulo.tex`, `documento_tecnico.tex`, `perfil_recomendaciones.tex`, `README.md`, `generated/`)
+  - `tests/test_final_deliverables.py`
+  - `.gitignore` (archivos auxiliares de LaTeX)
+  - El paso 1 (conectar pestañas en `dashboard/app.py`) ya estaba hecho por HACK-016/017/019; no se tocó `app.py`.
 - **Sprint:** 4 · **Priority:** `P1` · **DependsOn:** `HACK-014, HACK-015, HACK-016, HACK-017`
 - **AllowedPaths:**
   - `dashboard/app.py`
@@ -987,8 +993,71 @@ Revisor independiente, 2026-10-21. El estado no pasa a `APPROVED` hasta registra
   python -m pytest -q
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿Todas las cifras citadas en `docs/DOCUMENTO_TECNICO.md` y `docs/PERFIL_Y_RECOMENDACIONES.md` coinciden exactamente con los CSV de `reports/`?
-  - [ ] ¿`git status` confirma que no hay ningún archivo `.parquet`, `.pkl` ni CSV pitch-by-pitch rastreado por git?
+  - [x] ¿Todas las cifras citadas en `docs/DOCUMENTO_TECNICO.md` y `docs/PERFIL_Y_RECOMENDACIONES.md` coinciden exactamente con los CSV de `reports/`?
+  - [x] ¿`git status` confirma que no hay ningún archivo `.parquet`, `.pkl` ni CSV pitch-by-pitch rastreado por git?
+
+#### Notas de Revisión (Revisor independiente, 2026-10-21): CHANGES_REQUESTED
+- **Verify:** `.venv/Scripts/python.exe -m pytest -q` -> 403 passed in 131.40 s, exit 0. `tests/test_final_deliverables.py` solo -> 9 passed in 5.34 s. Logs de pdflatex sin referencias indefinidas ni cajas desbordadas (7 y 4 págs.).
+- **Checklist (ambos puntos pasan; las casillas quedan abiertas hasta el veredicto final):** (a) recalculé con pandas desde `reports/` holdouts (r, RMSE, mejora de log-loss, 18/21, rango de Pitching+ 9.7-39.7 %), calibración, estabilidad, densidad, reetiquetado, H1 (TIB/IVB/HB/ZS, whiff, HR), H2-H4, canales (shares 9/42/48 %, ratio 4.7), contrafactual por familia, leaderboard (n=464, media/mediana/mín/máx, 10 positivos, r=-0.51, grupos 60 %/30 %), los tres casos (cifras, ranks, percentil 97) y el Sculptor (re-ejecutado): todo coincide. (b) `git ls-files`: ningún `.parquet`/`.pkl`/`data/`; los 15 CSV de `reports/` son agregados (sin `PitchUID`).
+- **Hallazgos que bloquean (honestidad y exactitud, AGENTS.md §2):**
+  1. `docs/latex/documento_tecnico.tex:144` "H2 ... confirmada": la evidencia es solo el contrafactual del propio modelo (`delta_stuff_cdmx`), y el grupo "aerodinámico" es Recta 4C + Curva + Slider (excluye sinker y cutter, `analysis/run_hypotheses.py:257-258`), sin definirlo en el texto. Los datos observados contradicen H2 para el cambio: pierde 4.5 in de quiebre total (3.º mayor, casi igual que la recta) y 1.96 pp de whiff (la mayor caída significativa). Corrección: "consistente con el contrafactual del modelo; no respaldada por el movimiento ni el whiff observados del cambio", y definir los grupos. Lo mismo en `perfil_recomendaciones.tex:32`, que además omite que el cambio y el splitter pierden más \splus\ que el cutter y la curva (-1.6/-1.3 frente a -0.4/-0.5), no solo más que el slider.
+  2. `docs/latex/documento_tecnico.tex:125` "H1 ... confirmada": H1 (línea 34) es diferencial ("los que viven de movimiento aerodinámico pierden más"). El slider, que es de giro, es el más resistente, y el cambio pierde casi lo mismo que la recta. Corrección: "confirmada para las rectas; parcial en el resto".
+  3. `docs/latex/documento_tecnico.tex:137` "El contrafactual del modelo coincide con la física observada": solo coincide en los extremos. El sinker pierde más quiebre observado que la recta (-4.8 frente a -4.7 in), pero el modelo le resta menos de la mitad (-2.1 frente a -4.5). El cambio pierde -4.5 in, pero el modelo le resta -1.6. Corrección: "coincide en los extremos (rectas castigadas, slider resistente), no en el orden intermedio", y nombrar el caso del sinker.
+  4. `docs/latex/documento_tecnico.tex:148` "El spin crudo protege en altitud": es una regresión transversal entre pitchers dentro de Extreme, sin comparación con No Altitude ni interacción, así que no prueba un efecto diferencial ni causal. Corrección: "dentro de Extreme, más spin se asocia con más valor". `docs/latex/perfil_recomendaciones.tex:30` dice además que SpinRate es "la única variable física asociada de forma significativa ... con más whiff", y es falso: SpinToBreakRatio también es significativa para whiff (p=0.04, coeficiente negativo). Hay que decir "de las cuatro variables de la regresión" y mencionar SpinToBreakRatio. Quitar o marcar como hipótesis "lo que queda de la fuerza de Magnus depende del giro".
+  5. `docs/latex/perfil_recomendaciones.tex:94-99` (Caso B): omite que su propio contraste observado 2025 Extreme - No Altitude es favorable (`canal_total` = +0.0249, es decir +2.49 carreras por 100 pitcheos mejor en Extreme), mientras que el Caso C (`:112`) sí cita `canal_total` porque apoya su narrativa. Es reporte selectivo. Corrección: generar `cb.canaltotal` (y `ca*.canaltotal`, +0.85/+1.45) y declararlo ("en su muestra observada rindió mejor en Extreme; el \splus\ describe la física, no ese resultado").
+  6. `docs/latex/perfil_recomendaciones.tex:119` y `tab_sculptor`: los "74 pitchers reales con su misma mecánica" incluyen al propio pitcher\_00466. `src/sculptor/optimizer.py:104` no lo excluye, así que son 73 pares. El IQR 88.6-92.3 no es "de esos pares": sale de las 25 filas de Recta 4C más cercanas (pitcher-temporada, 22 pitchers), que incluyen su propia recta 2025 con distancia 0 (`optimizer.py:136-147`). Los conteos de Curva (10) y Cambio (31) en `tab_sculptor` también lo incluyen. Corrección en `analysis/build_paper_numbers.py:417` (pasar el catálogo sin pitcher\_00466) o decirlo de forma explícita, y describir el IQR como "las 25 rectas más cercanas".
+  7. `docs/latex/documento_tecnico.tex:73` "\pplus ... con la misma arquitectura multi-objetivo": es falso. `PitchingPlusModel.fit` (`src/models/location_pitching.py:501-582`) entrena 7 clasificadores y 1 regresor directamente sobre los targets (sin offset de conteo; el conteo es feature), con un Ridge(alpha=1) sin restricción de signo, ajustado dentro de muestra (sin OOF) y con todas las altitudes de 2024-2025, no solo No Altitude. Corrección: describirlo tal cual y aclarar que sus etiquetas incluyen el carry de altitud.
+  8. `docs/latex/documento_tecnico.tex:43` "$\hat\rho$ separa limpiamente las tres categorías": el suavizado Bayes empírico encoge cada juego hacia la mediana de su propia `altitude_category` (`src/physics/density.py:12-13,129-141`), y eso no se declara. Además, las distribuciones se traslapan (p90 Extreme 2026 = 0.919 > p10 Medium 2024/2025 = 0.854/0.858; p90 Medium 2025 = 0.949 ≈ p10 No 2024 = 0.949). Corrección: declarar el prior por categoría y decir que se separan las medianas, no los juegos.
+  9. `docs/latex/documento_tecnico.tex:97`: (a) "confirma que el comando es la mayor fuente de valor por pitcheo" es una sobreafirmación. \lplus\ usa la ubicación realizada más el conteo, y su correlación con el xRV del mismo pitcheo es en buena parte mecánica (bola/strike). Decir "la ubicación del pitcheo explica la mayor parte del valor de un pitcheo aislado". (b) "la ubicación sin física no predice el tipo de contacto" no explica un modelo un 84-96 % **peor** que el baseline (un modelo sin información empataría): es mala calibración o sobreajuste, y debe decirse así. (c) Omite que `out_on_pitch` de \lplus\ también pierde contra el baseline en los tres holdouts (-9.3 a -10.6 %).
+- **Hallazgos menores (corregir en la misma pasada):**
+  10. `documento_tecnico.tex:26` "la atmósfera estándar da $\rho/\rho_0 \approx 0.78$" a 2,240 m: la ISA da ≈ 0.80. Además conviene una frase que reconcilie ese valor con $\hat\rho_{CDMX}$ = 0.852 (relativo a la mediana No Altitude y mezcla de parques).
+  11. `documento_tecnico.tex:15,43` "mediana de (todos) los juegos Extreme": es la mediana por **pitcheo** de las filas Extreme de **2024-2025** (`src/models/stuff.py:497`, entrenamiento `year <= 2025`).
+  12. `documento_tecnico.tex:79` "$\hat y$ es el valor en carreras esperado del pitcheo": para \splus\ es el residuo esperado sobre el baseline de conteo (`stuff.py:734-750`, meta-Ridge sobre `resid["xrv_pitcher"]`).
+  13. `documento_tecnico.tex:69` "Una auditoría de fuga confirma que ... 0.31 ... frente a 0.18": no dice qué confirma. Reportar el exceso (0.13) y el criterio aprobado (≤ 0.20, HACK-010).
+  14. `documento_tecnico.tex:112` "milésimas de carrera en todos los modelos": \splus\ en el holdout de parque tiene una media de 0.0105 (más de una centésima).
+  15. `documento_tecnico.tex:44` "El sesgo de reetiquetado baja a -1.62 pp": con `pitch_id` invariante, el residuo es cambio real de uso, no sesgo. El slider conserva +1.75 pp y no se menciona.
+  16. `perfil_recomendaciones.tex:16,46` "recta de mucho ride", y `:44` "slider o curva como pitcheo principal": no están estratificados en ningún análisis (el -4.5 es la media de todas las rectas). Medirlo o suavizar el texto. `:19,62` "estabilidad del $\Delta$": no hay ninguna medida de estabilidad del $\Delta$ en `reports/`. `:60` "Un radar de mano estrecha el rango": `prospect_card.py:195` lo reporta "sin exigir mejora", así que hay que decir "puede estrechar". `:89` "su precio de mercado se fija con métricas neutrales" no tiene respaldo.
+  17. `perfil_recomendaciones.tex:75,79`: los lugares "de 464" agrupan las temporadas 2024-2026 (son pitcher-temporadas, no la liga de un año), y los scores 2024-2025 de los casos son dentro de muestra (`analysis/export_scores.py:33-34`). Aclararlo.
+  18. `perfil_recomendaciones.tex:17`: los umbrales 60 %/30 % están escritos a mano, mientras que el generador usa 0.6/0.3 (`build_paper_numbers.py:355`). Convertirlos en macros. `build_paper_numbers.py:38`: el comentario dice ">= 400 pitcheos" pero `MIN_PITCHES_RANK` = 500.
+  19. `documento_tecnico.tex:1`, `perfil_recomendaciones.tex:1`: `article` ignora `[10.5pt]` (el log dice "Unused global option(s)"). Usar 10pt/11pt o `extarticle`.
+- **Respuesta del Worker (2026-10-21), los 19 puntos atendidos:**
+  1. H2 pasa a "consistente con el modelo, no con lo observado", define los grupos (cambio y splitter frente a recta 4C, curva y slider) y cita el quiebre y el whiff observados del cambio. El perfil ya no la presenta como apuesta segura y compara con el cutter y la curva.
+  2. H1: "confirmada para las rectas, parcial en el resto".
+  3. Contrafactual: "coincide solo en los extremos"; se nombran el sinker y el cambio, también en el pie de la Figura 1.
+  4. H4 se presenta como asociación transversal dentro de Extreme, no causal. El perfil menciona SpinToBreakRatio para whiff y ya no habla de Magnus.
+  5. Se generan `ca1.ct`, `ca2.ct` y `cb.ct` (canal_total) y se declaran en los casos A y B.
+  6. El Sculptor del caso C usa el catálogo sin pitcher\_00466: 73 pares y `sc.fs.nrows` = 25 rectas más cercanas.
+  7. Pitching+ se describe tal como es: sin offset, Ridge(α=1) sin signo, dentro de muestra y con todas las altitudes.
+  8. Se declara el prior por categoría; se separan las medianas y los juegos se traslapan (macros `rho.ext.p90max` y `rho.med.p10min`).
+  9. Location+: el valor es de la ubicación y el conteo, en parte mecánico. Rodado y `out_on_pitch` quedan por debajo del baseline (macros `val.loc.*`), lo que indica mala calibración o sobreajuste.
+  10. ρ/ρ₀ ≈ 0.80, con una frase que lo reconcilia con 0.852.
+  11. "Mediana por pitcheo de Extreme 2024-2025".
+  12. ŷ de Stuff+ es el residuo sobre el conteo.
+  13. Auditoría de fuga: exceso 0.13 ≤ criterio 0.20, con la referencia descrita.
+  14. Calibración: salvedad para Stuff+ en el holdout de parque (macro).
+  15. Las diferencias residuales de uso son cambios reales; se incluye el slider.
+  16. Se quitan "mucho ride", "pitcheo principal", "estabilidad del Δ" y "precio de mercado" (también en el título del caso A); "puede estrechar".
+  17. Se aclara que los lugares son pitcher-temporadas 2024-2026 y que 2024-2025 es dentro de muestra.
+  18. Umbrales como macros (`FS_HIGH`, `FS_LOW`) y comentario corregido.
+  19. `[10pt]`.
+  
+  Verify: `python -m pytest -q` en verde. PDF recompilados sin errores, sin cajas desbordadas y sin opciones ignoradas (7 y 4 págs.). Estado → `REVIEW`.
+
+#### Notas de Revisión, 2.ª pasada (Revisor independiente, 2026-10-21): CHANGES_REQUESTED
+- **Verify:** `.venv/Scripts/python.exe -m pytest -q` -> 404 passed in 144.76 s, exit 0. `tests/test_final_deliverables.py` -> 9 passed. Logs de pdflatex: 7 y 4 págs., sin "Unused global option", sin cajas desbordadas ni referencias indefinidas; PDF posteriores a los `.tex`.
+- **Los 19 hallazgos quedan resueltos.** Revisé cada uno contra el texto nuevo (`documento_tecnico.tex:15,26,43,44,69,73,79,97,112,125,134,137,144,148,175`; `perfil_recomendaciones.tex:16,17,19,28,30,32,44,46,60,62,70,73,81,89,100,120`; generador `:43,153-154,171,232-235,248,365-366,391,430,438`).
+- **Cifras nuevas recalculadas desde los CSV:** coinciden. `ca1.ct` +0.85, `ca2.ct` +1.45, `cb.ct` +2.49 (100·`canal_total`); `rho.ext.p90max` 0.919, `rho.med.p10min` 0.854; `diag.loc.excess` 0.13; `cal.stuff.park.mean` 0.0105; Location+ rodado 84-96 % y `out_on_pitch` 9.3-10.6 % peor que el baseline. Sculptor sin pitcher\_00466 (filtro propio, independiente del optimizador): 73 pares; las 25 rectas más cercanas dan IQR 88.6-92.3, mejor 95.7 (+5.4); repertorio Slider 49/111.3, Curva 9/1,285/107.6, Cambio 30/4,313/103.4. Todo igual a `cifras.tex` y `tab_sculptor.tex`.
+- **Hallazgo pendiente (nuevo; se me pasó en la 1.ª pasada):**
+  20. `docs/latex/perfil_recomendaciones.tex:129` (Caso C, "En casa"): "subir la curva y el cambio, que no pierden valor". Es falso para el cambio: su propio cambio baja de 106.8 a 105.1 ($\Delta$ = −1.68, `tab_cc_arsenal`) y en la liga el cambio pierde −1.6. Además, el ítem 5 del perfil (`:32`) dice ahora que el cambio "no es la apuesta segura", así que el texto se contradice. Corrección: "subir la curva, que no pierde valor (\cf{cc.curveball.sd}), y el cambio, que pierde poco (\cf{cc.changeup.sd}) frente a la recta (\cf{cc.fourseam.sd})", o equivalente con macros.
+- **Checklist:** (a) y (b) siguen cumpliéndose (sin `.parquet`/`.pkl`/`data/` rastreados; CSV de `reports/` agregados). Se marcarán `[x]` al aprobar, una vez corregido el punto 20.
+- **Respuesta del Worker al punto 20 (2026-10-21):** `perfil_recomendaciones.tex:129` ahora dice que la curva no pierde valor (`cc.curveball.sd`) y que el cambio pierde poco frente a la recta (`cc.changeup.sd` contra `cc.fourseam.sd`). PDF recompilado (4 págs., sin errores); `tests/test_final_deliverables.py` 9 passed. Estado → `REVIEW`.
+
+#### Notas de Revisión, 3.ª pasada (Revisor independiente, 2026-10-21): APPROVED
+- **Punto 20 resuelto:** `perfil_recomendaciones.tex:129` dice ahora que la curva no pierde valor (Δ = +0.29) y que el cambio pierde poco frente a la recta (−1.68 contra −9.77). Las macros coinciden con `tab_cc_arsenal`, y el texto ya no contradice `:32`.
+- **Verify:** `.venv/Scripts/python.exe -m pytest -q` -> 404 passed in 139.01 s, exit 0. `perfil_recomendaciones.pdf` se recompiló después del `.tex` (4 págs.), sin opciones ignoradas, cajas desbordadas ni referencias indefinidas.
+- **Checklist marcado:** (a) las cifras de ambos documentos salen de `generated/` y coinciden con los CSV de `reports/`; las recalculé de forma independiente en las tres pasadas. (b) No se rastrea ningún `.parquet`, `.pkl` ni nada en `data/`; los CSV de `reports/` son agregados, sin `PitchUID`.
+- **Alcance:** HACK-018 solo toca sus AllowedPaths efectivos. Los cambios en `dashboard/*`, `tests/test_dashboard_design.py` y `.claude/` no son de esta tarea y no deben entrar en su commit. Queda pendiente, sin bloquear: revisar el texto de VeloVision cuando HACK-017 (`IN_PROGRESS`) se apruebe.
+- **Proceso y alcance:** los archivos de HACK-018 respetan los AllowedPaths efectivos. Pero el árbol de trabajo trae también `dashboard/app.py`, `dashboard/theme.py`, `dashboard/ui_utils.py` (modificados a las 15:22-15:23, después de los archivos de HACK-018 de las 14:06) y `.claude/launch.json`, que no son de esta tarea y no deben entrar en su commit. Además, HACK-018 depende de HACK-017, que sigue `IN_PROGRESS`: el texto de VeloVision (`documento_tecnico.tex:167,178`, `perfil_recomendaciones.tex:60`) debe revisarse cuando HACK-017 se apruebe.
 
 <!-- Coordinación 2026-10-20: HACK-012 y HACK-013 regresan a REVIEW tras Verify exitoso de Workers. Las observaciones del revisor interno quedan como antecedentes, sin veredicto autorizado. Solo el revisor externo del usuario emite APPROVED o CHANGES_REQUESTED. -->
 
