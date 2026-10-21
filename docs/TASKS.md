@@ -20,15 +20,16 @@
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
-| **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
+| **HACK-010** | S2 | P0 | `IN_PROGRESS` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
-| **HACK-012** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
-| **HACK-013** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
-| **HACK-014** | S2 | P0 | `APPROVED` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
+| **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
+| **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
+| **HACK-014** | S2 | P0 | `AVAILABLE` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
 | **HACK-017** | S3 | P1 | `AVAILABLE` | `HACK-014` | Módulo **VeloVision** (MediaPipe Pose $\to$ rango Stuff+ CDMX) + validación manual (`src/vision/pose_slot.py`) |
 | **HACK-018** | S4 | P1 | `AVAILABLE` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/`) |
+| **HACK-019** | S3 | P1 | `IN_PROGRESS` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
 
 ---
 
@@ -333,7 +334,7 @@
 ---
 
 ### `HACK-010` — Submodelo `Stuff+` en Sabores Neutral y CDMX (`src/models/stuff.py`)
-- **State:** `APPROVED` (reapertura del Orquestador 2026-10-20 aprobada por el Revisor)
+- **State:** `IN_PROGRESS` (re-corrida requerida por la segunda reapertura de HACK-010)
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-009`
 - **AllowedPaths:**
   - `src/models/stuff.py`
@@ -397,6 +398,30 @@
 - **Criterios adicionales:** (3) los tests prueban que alterar `Balls`/`Strikes` no cambia `stuff_plus_neutral` pero sí `predict_outcomes`; (4) `predict_outcomes` en el fixture no produce NaN ni probabilidades fuera de `[0, 1]`.
 - **Prohibido** ajustar hiperparámetros mirando los holdouts de HACK-012.
 
+#### Segunda reapertura del Orquestador (2026-10-20) — quitar los proxies de ubicación
+- **Motivo, de una investigación de sensibilidad de solo lectura:**
+  - Con `STUFF_FEATURES` se reconstruye `PlateLocHeight` / `PlateLocSide` con R² fuera de muestra ≈ 0.995 / 0.994.
+  - Los ángulos de soltura y los túneles a 170 ms concentran ~65 % del |SHAP|, y el IVB solo ~3 %.
+  - La sensibilidad mediana de Stuff+ en Four-Seam es +0.09 puntos por pulgada de IVB.
+  - La física es determinista: soltura + ángulos de soltura + velocidad + movimiento ⇒ ubicación en el plato. Es el mismo motivo por el que la especificación ya excluía `VertApprAngle`.
+- **Cambio requerido:**
+  1. Sacar de `STUFF_FEATURES`: `VertRelAngle`, `HorzRelAngle_norm`, `tunnel_dist_170ms_in` y `tunnel_sim_170ms`.
+     - Siguen disponibles para Location+ y Pitching+ (HACK-011), donde la ubicación sí está permitida. Así se cumple AGENTS.md §3.6, que pide que ambos túneles existan como features del proyecto.
+     - Se conservan `tunnel_dist_release_in` y `tunnel_sim_release`, que solo usan el punto de soltura.
+     - Ajusta también la reconstrucción de la recta primaria (`_fit_primary_fb_reference`, `_recompute_arsenal_diffs_at_density`) para que no dependa de esos campos.
+  2. Agrega a `assert_valid_stuff_features` una lista explícita `TRAJECTORY_PROXY_COLS` (`VertRelAngle`, `HorzRelAngle`, `HorzRelAngle_norm`, `VertApprAngle`, `HorzApprAngle`, `tunnel_dist_170ms_in`, `tunnel_sim_170ms`) que lance error si alguna entra a Stuff+.
+  3. **Regularización:** elige hiperparámetros de LightGBM (`min_child_samples`, `num_leaves`, `reg_lambda`, `learning_rate` / `n_estimators`) con CV por `pitcher_anon_id` **solo dentro de No Altitude, year ≤ 2025**, nunca mirando los holdouts de HACK-012. Documenta la rejilla y la elección.
+  4. Conserva todo lo demás aprobado: residuo sobre el conteo, `predict_outcomes`, OOF, entrenamiento de resultados en No Altitude, referencia de recta guardada en `fit`, SHAP aditivo, escala calibrada sobre el LMB completo con μ/σ neutrales.
+- **Criterios adicionales:**
+  - **(5)** Ninguna columna de `TRAJECTORY_PROXY_COLS` está en `feature_cols`. Lo verifica un test.
+  - **(6)** Un script de diagnóstico, `analysis/stuff_diagnostics.py` (nuevo en AllowedPaths), reporta sobre datos reales en `reports/validation/stuff_diagnostics.csv`:
+    - el R² fuera de muestra de reconstruir `PlateLocHeight` y `PlateLocSide` desde las features finales de Stuff+, que debe ser **≤ 0.30**;
+    - la sensibilidad mediana de Stuff+ por pulgada de IVB y HB y por mph, por `pitch_id`, con los derivados recalculados;
+    - el ΔStuff+ CDMX medio por `pitch_id` con IC bootstrap por pitcher.
+    Estas cifras se reportan tal cual; no hay umbral de sensibilidad que forzar.
+- **Efecto aguas abajo:** HACK-012, HACK-013 y HACK-014 vuelven a `AVAILABLE` y deben re-correrse con el modelo nuevo. El criterio de HACK-012 se revisará con los resultados reales.
+- **AllowedPaths de esta reapertura:** `src/models/stuff.py`, `tests/test_stuff.py`, `analysis/stuff_diagnostics.py`, `reports/validation/stuff_diagnostics.csv`.
+
 ### `HACK-011` — Submodelos `Location+` y `Pitching+` Multi-Target (`src/models/location_pitching.py`)
 - **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-008`
@@ -430,7 +455,7 @@
 ---
 
 ### `HACK-012` — Suite de Validación en los 3 Holdouts vs Baseline Nulo (`analysis/run_validation.py`)
-- **State:** `APPROVED`
+- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/__init__.py`
@@ -487,7 +512,7 @@
 ---
 
 ### `HACK-013` — Descomposición Canal Stuff vs. Canal Parque y Pruebas H1–H4 (`analysis/run_hypotheses.py`)
-- **State:** `APPROVED`
+- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/run_hypotheses.py`
@@ -538,7 +563,7 @@
 ---
 
 ### `HACK-014` — Exportador Oficial del Entregable 1 y Artefactos para Dashboard (`analysis/export_scores.py`)
-- **State:** `APPROVED`
+- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-012, HACK-013`
 - **AllowedPaths:**
   - `analysis/export_scores.py`
@@ -734,3 +759,29 @@
 <!-- Orquestador 2026-10-20: reconciliadas rutas de salida agregadas HACK-012/013 a petición del revisor externo. HACK-012 conserva CHANGES_REQUESTED: mejorar modelos exige reabrir su tarea/AllowedPaths; no se autoriza cambiar criterios ni métricas. HACK-013 reasignada para atender la alternativa explícita de no estimabilidad. -->
 
 <!-- Entrega Worker HACK-013 2026-10-20: Verify 6 passed in 1.79s, exit 0; diff --check limpio. Estado de descomposición NOT_ESTIMABLE y razón explícita en channel_decomposition.csv. Residuo permanece sin atribuir; aceptación aditiva pendiente de decisión del revisor externo. -->
+
+---
+
+### `HACK-019` — Rediseño Visual de Diablos AeroVision (`dashboard/`)
+- **State:** `IN_PROGRESS` (Fase 0 aprobada por el usuario el 2026-10-20: mockup v2 en modo claro, `docs/mockups/hack019_mockup.html`. Siguiente: Fase 1)
+- **Sprint:** 3 · **Priority:** `P1` · **DependsOn:** `HACK-015, HACK-016`
+- **AllowedPaths:**
+  - `docs/mockups/hack019_mockup.html` (Fase 0)
+  - `dashboard/**` (Fases 1–3)
+  - `.streamlit/config.toml`
+  - `tests/test_dashboard_smoke.py`
+  - `tests/test_dashboard_design.py`
+  - `docs/PLAN_REDISENO_UI.md`
+- **Especificación:** [`docs/PLAN_REDISENO_UI.md`](PLAN_REDISENO_UI.md) (diagnóstico, dirección visual, estructura y fases). Usabilidad base: [`docs/DISENO_UI_NIELSEN.md`](DISENO_UI_NIELSEN.md), con las 4 correcciones del §1.1 del plan.
+- **Fase 0:** mockup HTML estático de Simulador, Leaderboard con tarjeta de lanzador y Sculptor, con cifras tomadas de los CSV reales de `reports/`. Requiere aprobación del usuario antes de la Fase 1.
+- **Criterios de Aceptación:** los 6 del §5 de `docs/PLAN_REDISENO_UI.md`.
+- **Verify Command:**
+  ```powershell
+  python -m pytest -q tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_sculptor.py
+  ```
+- **Reviewer Checklist:**
+  - [ ] ¿El rojo `#CE1126` solo aparece como marca y nunca como dato?
+  - [ ] ¿ρ̂ CDMX y la descomposición se leen de modelo/CSV, sin cifras hardcodeadas?
+  - [ ] ¿Contraste medido ≥ 4.5:1 en texto normal?
+  - [ ] ¿Se conservan literales los textos de honestidad de HACK-015/016?
+

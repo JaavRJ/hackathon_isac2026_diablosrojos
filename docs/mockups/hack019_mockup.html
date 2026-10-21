@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Diablos AeroVision — Mockup HACK-019 (v2, modo claro)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ===== TOKENS (modo claro; contraste medido sobre #FFFFFF) =====
+   El rojo de marca #CE1126 va SOLO en logo, pestaña activa, botón primario y preset activo. */
+:root{
+  --page:#F6F7F9; --card:#FFFFFF; --bg0:#FFFFFF; --soft:#F0F2F5; --line:#E3E6EB;
+  --text:#14181F; --muted:#5B6470;
+  --brand:#CE1126;
+  /* Escala divergente ordenada: coral (pierde) -> gris (promedio) -> turquesa (gana) */
+  --loss:#B83A28; --neutral:#5B6470; --gain:#0B7A66;
+  --loss-bg:#FCEBE7; --gain-bg:#E3F5F1; --neu-bg:#EEF0F3;
+  /* Marcador "tu pitcheo" y niveles (neutros) */
+  --navy:#1F3A5F; --lvl-sea:#7C8999; --lvl-cdmx:#3E5C7A; --density:#3E5C7A;
+  --cat-stuff:#2F6FB5; --cat-park:#7A52C7;
+  --warn-bg:#FFF6E0; --warn-line:#F2C14E; --warn-text:#5C3D00;
+  --f-txt:'Inter',system-ui,sans-serif; --f-num:'Barlow Condensed','Inter',sans-serif; --f-mono:'JetBrains Mono',ui-monospace,monospace;
+  --sh:0 1px 2px rgba(16,24,40,.06),0 6px 18px rgba(16,24,40,.06); --r:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:min(0.88vw,1.45vh)}
+html,body{height:100%;background:var(--page);color:var(--text);font-family:var(--f-txt);overflow-x:hidden}
+body{display:flex;flex-direction:column;border-top:.25rem solid var(--brand);line-height:1.3}
+.mut{color:var(--muted)} .gain{color:var(--gain)} .loss{color:var(--loss)} .neu{color:var(--neutral)}
+small{font-size:.75em;color:var(--muted);font-weight:500;margin-left:.2em}
+.sm{font-size:.72rem}
+.ic{width:1.15em;height:1.15em;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-.2em}
+.ic.lg{width:1.6rem;height:1.6rem}
+
+/* ---- encabezado ---- */
+.top{display:flex;align-items:center;gap:1.2rem;padding:.55rem 1.4rem .2rem;flex:none}
+.wm{display:flex;align-items:center;gap:.6rem;font-weight:800;font-size:1.35rem;letter-spacing:-.01em}
+.wm .d{width:2.1rem;height:2.1rem;border-radius:.6rem;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800;font-size:1.3rem;box-shadow:0 3px 8px rgba(206,17,38,.3)}
+.wm span{font-weight:500;color:var(--muted)}
+nav{display:flex;gap:.2rem;margin-left:1rem}
+nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:.4rem;padding:.45rem .8rem;border-radius:99px;font-size:.88rem;font-weight:600;color:var(--muted)}
+nav button:hover{background:var(--soft);color:var(--text)}
+nav button.on{background:var(--card);color:var(--text);box-shadow:var(--sh);outline:2px solid var(--brand);outline-offset:-2px}
+nav button.dis{opacity:.8;cursor:default}
+nav .soon{font-size:.58rem;font-weight:700;letter-spacing:.05em;border:1px dashed var(--muted);padding:.02rem .3rem;border-radius:.3rem;color:var(--muted)}
+.spacer{flex:1}
+.tools{display:flex;gap:.45rem;align-items:center}
+.tbtn{display:flex;align-items:center;gap:.35rem;font-size:.78rem;font-weight:600;padding:.38rem .7rem;border:1px solid var(--line);background:var(--card);border-radius:99px;color:var(--text)}
+.tgl{width:2rem;height:1.05rem;border-radius:99px;background:#CDD2DA;position:relative;margin-left:.2rem}
+.tgl::after{content:"";position:absolute;left:.15rem;top:.15rem;width:.75rem;height:.75rem;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.sub{display:flex;align-items:center;gap:.8rem;padding:.3rem 1.4rem .55rem;flex:none}
+.crumb{display:flex;align-items:center;gap:.5rem;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:.32rem .9rem;font-size:.82rem;box-shadow:var(--sh)}
+.crumb b{font-weight:700} .crumb i{width:1px;height:1rem;background:var(--line)}
+.anc{display:flex;gap:.4rem;align-items:center}
+.ap{display:flex;align-items:center;gap:.35rem;font-size:.76rem;background:var(--card);border:1px solid var(--line);border-radius:99px;padding:.28rem .7rem;font-weight:600}
+.ap b{font-weight:800;font-size:.86rem;font-variant-numeric:tabular-nums}
+.ap .ic{color:var(--gain)}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;font-size:.84rem;font-weight:700;padding:.55rem 1rem;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text)}
+.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;box-shadow:0 4px 12px rgba(206,17,38,.28)}
+.btn.block{display:flex;width:100%}
+main{flex:1;min-height:0;position:relative}
+.screen{display:none;height:100%;padding:.2rem 1.4rem 1rem;overflow:hidden}
+.screen.on{display:block}
+#sim{overflow-y:auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:.9rem 1.1rem;min-width:0;min-height:0}
+h4{display:flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.bd{font-family:var(--f-mono);font-size:.6rem;color:var(--muted);border:1px solid var(--line);background:var(--soft);padding:.1rem .45rem;border-radius:.3rem;white-space:nowrap}
+.bds{display:flex;gap:.35rem;flex-wrap:wrap}
+.tag{font-size:.6rem;font-weight:600;color:var(--text);border:1px solid var(--line);background:var(--soft);padding:.05rem .4rem;border-radius:99px;display:inline-block;margin-top:.2rem}
+.note{font-size:.7rem;color:var(--muted);line-height:1.4}
+.note.ill{border-left:3px solid var(--warn-line);padding-left:.5rem}
+.pill{display:inline-flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:700;border-radius:99px;padding:.15rem .6rem;background:var(--soft);color:var(--muted)}
+
+/* ===== SIMULADOR ===== */
+.simmain{display:grid;grid-template-columns:20rem 1fr;gap:1rem;height:min(100%,61rem);min-height:0}
+.rail{display:flex;flex-direction:column;gap:.7rem;justify-content:space-between}
+.rail h3{font-size:1.05rem;font-weight:800;display:flex;gap:.5rem;align-items:center}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem}
+.pc{border:1.5px solid var(--line);border-radius:12px;padding:.6rem .3rem;text-align:center;font-size:.72rem;font-weight:700;display:flex;flex-direction:column;align-items:center;gap:.35rem;background:var(--card)}
+.pc .ic{width:1.7rem;height:1.7rem;color:var(--muted)}
+.pc.on{border-color:var(--brand);background:#FFF3F4;color:var(--text);box-shadow:0 3px 10px rgba(206,17,38,.15)}
+.pc.on .ic{color:var(--brand)}
+.sl{display:flex;flex-direction:column;gap:.3rem}
+.slt{display:flex;align-items:center;gap:.4rem;font-size:.9rem;font-weight:600;color:var(--muted)}
+.slt span{flex:1}
+.slt b{font-size:1.45rem;color:var(--text);font-weight:800;font-variant-numeric:tabular-nums}
+.slt b small{margin-left:.2rem}
+.track{height:.5rem;background:#E7EAEF;border-radius:99px;position:relative;margin:.2rem 0 .1rem}
+.track .zona{position:absolute;top:-.2rem;bottom:-.2rem;background:rgba(11,122,102,.16);border:1px solid rgba(11,122,102,.55);border-radius:.3rem}
+.track u{position:absolute;top:-.3rem;width:1.1rem;height:1.1rem;border-radius:50%;background:#fff;border:3px solid var(--navy);margin-left:-.55rem;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+.zleg{display:flex;align-items:center;gap:.4rem;font-size:.68rem;color:var(--muted)}
+.zleg i{width:1.4rem;height:.6rem;background:rgba(11,122,102,.16);border:1px solid rgba(11,122,102,.55);border-radius:.2rem}
+
+.rightcol{display:flex;flex-direction:column;gap:.8rem;min-height:0}
+.verdict{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn-text);border-radius:var(--r);padding:.7rem 1.1rem;display:flex;gap:.8rem;align-items:flex-start}
+.verdict.gain{background:var(--gain-bg);border-color:#7CCFBE;color:#0B4A3E}
+.verdict .ic{width:1.6rem;height:1.6rem;margin-top:.1rem;flex:none}
+.verdict p{font-size:.95rem;line-height:1.4}
+.verdict .ref{margin-top:.35rem;font-size:.88rem;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.verdict .tag{background:rgba(255,255,255,.7);border-color:var(--warn-line);color:var(--warn-text);margin:0}
+.cards3{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:.9rem}
+.big{display:flex;flex-direction:column;gap:.6rem;justify-content:space-evenly}
+.big .hd{display:flex;align-items:center;gap:.5rem;font-weight:800;font-size:1rem}
+.big .hd .pill{margin-left:auto}
+.stf{display:flex;align-items:flex-end;gap:.8rem}
+.stf .n{font-family:var(--f-num);font-weight:700;font-size:8.2rem;line-height:.85;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.stf .l{font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:.4rem}
+.dpill{display:inline-flex;align-items:center;gap:.25rem;font-weight:800;font-size:.9rem;padding:.2rem .65rem;border-radius:99px;font-variant-numeric:tabular-nums}
+.dpill.loss{background:var(--loss-bg);color:var(--loss)} .dpill.gain{background:var(--gain-bg);color:var(--gain)} .dpill.neu{background:var(--neu-bg);color:var(--neutral)}
+.stf .dpill{font-size:1.4rem;margin-bottom:.35rem}
+.mini2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.mini{background:var(--soft);border-radius:12px;padding:.9rem 1rem;display:flex;flex-direction:column;gap:.2rem}
+.mini .t{font-size:.85rem;font-weight:700;color:var(--muted);display:flex;gap:.35rem;align-items:center}
+.mini .v{font-size:2.7rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.mini .v small{font-size:.45em}
+.gauge{display:flex;flex-direction:column;gap:.4rem}.gt{display:flex;justify-content:space-between;font-size:.85rem;font-weight:600;color:var(--muted)}.gt b{font-weight:800;font-variant-numeric:tabular-nums}
+.gtrack{position:relative;height:.7rem;background:linear-gradient(90deg,var(--loss-bg),var(--neu-bg) 50%,var(--gain-bg));border-radius:99px;border:1px solid var(--line)}
+.gtrack i{position:absolute;top:-.25rem;bottom:-.25rem;width:2px;background:var(--muted)}.gtrack u{position:absolute;top:-.3rem;width:1.1rem;height:1.1rem;margin-left:-.55rem;border-radius:50%;background:var(--navy);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.chips2{display:flex;gap:.5rem;flex-wrap:wrap}
+.chips2 span{font-size:.9rem;font-weight:600;color:var(--muted);border:1px solid var(--line);border-radius:99px;padding:.15rem .65rem}
+.chips2 b{color:var(--text);font-variant-numeric:tabular-nums}
+.diagcard{display:flex;flex-direction:column;gap:.4rem}
+.diag{flex:1;min-height:0;width:100%}
+svg .gl{stroke:#E3E6EB;stroke-width:.7} svg .gl2{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 3}
+svg .ax{fill:var(--muted);font-size:9px} svg .ax2{fill:var(--muted);font-size:9.5px;font-weight:600}
+svg .lb{fill:var(--text);font-size:12px;font-weight:700} svg .lb2{fill:var(--loss);font-size:12.5px;font-weight:800}
+.diag .ax,.minimap .ax,.hist .ax{font-size:11px} .diag .ax2,.minimap .ax2{font-size:11.5px} .minimap .lb,.hist .lb{font-size:13px}
+svg .comp{stroke:#B9C0CA;stroke-width:1.2;stroke-dasharray:3 3}
+
+.exp{margin-top:.2rem}
+.exptoggle{all:unset;cursor:pointer;display:flex;align-items:center;gap:.6rem;width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:.65rem 1.1rem;font-weight:700;font-size:.9rem;box-shadow:var(--sh)}
+.exptoggle .ch{margin-left:auto;transition:transform .2s}
+.exptoggle .pill{margin-left:.4rem}
+#analyst{display:none;margin-top:.8rem;flex-direction:column;gap:.8rem}
+#analyst.open{display:flex}
+.exp.open .ch{transform:rotate(180deg)}
+.mid3{display:grid;grid-template-columns:1.1fr 1fr 1.05fr;gap:.8rem}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:.5rem;margin-bottom:.4rem}
+.plane{height:19rem;display:flex}.plane svg{width:100%;height:100%}
+.shrow{display:grid;grid-template-columns:9rem 1fr 3.8rem;align-items:center;gap:.4rem;font-size:.78rem;padding:.2rem 0}
+.shtrack{position:relative;height:.9rem;display:block}
+.shtrack .zero{position:absolute;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.bar{position:absolute;top:.15rem;height:.6rem;border-radius:3px}
+.bar.gain{background:var(--gain)} .bar.loss{background:var(--loss)}
+.shv{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.plhead,.plrow{display:grid;grid-template-columns:1fr 3.4rem 3rem 2.8rem;align-items:center;gap:.4rem;font-size:.78rem;padding:.15rem 0}
+.plhead{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.pll small{display:block;font-family:var(--f-mono);font-size:.55rem;margin:0}
+.pltrack{height:.5rem;background:var(--soft);border-radius:3px;display:block}
+.pltrack b{display:block;height:100%;background:var(--lvl-cdmx);border-radius:3px}
+.plv{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.plc.na{font-family:var(--f-mono);font-size:.55rem;color:var(--muted);border:1px dashed #B9C0CA;border-radius:.25rem;text-align:center;padding:.05rem 0}
+.stack{display:flex;height:1.5rem;border-radius:.4rem;overflow:hidden;border:1px solid var(--line);background:var(--soft)}
+.s1{background:var(--cat-stuff)} .s2{background:var(--cat-park)}
+.s3{background:repeating-linear-gradient(135deg,var(--neutral) 0 .28rem,#fff .28rem .56rem);border-left:1px solid var(--neutral)}
+b.s1,b.s2,b.s3{display:block;height:100%}
+.sw{display:inline-block;width:.9rem;height:.9rem;border-radius:.25rem;flex:none;border:1px solid var(--line)}
+.dleg{display:flex;flex-direction:column;gap:.2rem;font-size:.78rem;margin-top:.4rem}
+.dleg div{display:flex;gap:.5rem;align-items:center}
+.dleg em{font-style:normal;font-weight:800;font-variant-numeric:tabular-nums}
+.dtot{display:flex;align-items:baseline;gap:.7rem;margin-bottom:.4rem}
+.dtot .num{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums}
+.valid{display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem}
+.valid div{background:var(--soft);border-radius:12px;padding:.6rem .8rem;font-size:.74rem;color:var(--muted)}
+.valid b{display:block;font-size:1.6rem;color:var(--gain);font-weight:800;font-variant-numeric:tabular-nums}
+
+/* ===== LEADERBOARD ===== */
+.lbwrap{display:grid;grid-template-columns:1fr 24rem;gap:1rem;height:min(100%,61rem);min-height:0}
+.lbleft{display:flex;flex-direction:column;gap:.8rem;min-height:0}
+.filters{display:flex;gap:.4rem;flex-wrap:wrap;align-items:center}
+.fchip{font-size:.74rem;font-weight:600;border:1px solid var(--line);background:var(--card);padding:.25rem .75rem;border-radius:99px;display:inline-flex;gap:.3rem;align-items:center}
+.fchip.on{border-color:var(--navy);color:var(--navy)}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;text-align:left;padding:.3rem .4rem;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:.9rem .4rem;border-bottom:1px solid var(--line);vertical-align:middle;font-variant-numeric:tabular-nums}
+td.n,.v{font-weight:700} .bc .v{display:inline-block;width:3.4rem}
+tr.sel td{background:#EEF3FA} tr.sel td:first-child{box-shadow:inset .25rem 0 0 var(--navy)}
+tr.gap td{text-align:center;color:var(--muted);font-size:.72rem;padding:.35rem}
+.pn{font-weight:700} .pn small{font-weight:500}
+.cellbar{display:inline-block;width:4.2rem;height:.55rem;background:var(--soft);border-radius:3px;vertical-align:middle}
+.cellbar b{display:block;height:100%;border-radius:3px}
+.lvl{background:var(--lvl-sea)} .lvl2{background:var(--lvl-cdmx)}
+.dbar{display:inline-block;position:relative;width:4.4rem;height:.55rem;background:var(--soft);border-radius:3px;vertical-align:middle;margin-left:.5rem}
+.dbar i{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.dbar b{position:absolute;top:0;bottom:0;border-radius:3px}
+.dbar b.loss{background:var(--loss)} .dbar b.gain{background:var(--gain)} .dbar b.neu{background:var(--neutral)}
+.pend{font-family:var(--f-mono);font-size:.6rem;color:var(--muted);text-align:center;border:1px dashed #B9C0CA;border-radius:.3rem;white-space:nowrap}
+.legend{display:flex;gap:1rem;font-size:.72rem;color:var(--muted);flex-wrap:wrap;align-items:center}
+.hist{width:100%;flex:1;min-height:0}
+.hb.loss{fill:var(--loss)} .hb.gain{fill:var(--gain)} .hb.neu{fill:#9AA3AF}
+.stamp{display:flex;flex-direction:column;gap:.7rem;background:linear-gradient(180deg,#fff,#F3F5F8);position:relative}
+.stamp::before{content:"";position:absolute;inset:.35rem;border:1px solid var(--line);border-radius:10px;pointer-events:none}
+.stamp .top{display:flex;justify-content:space-between;align-items:center}
+.stamp .nm{font-weight:800;font-size:1.5rem;letter-spacing:-.02em}
+.chiprow{display:flex;gap:.35rem;flex-wrap:wrap}
+.chip{font-size:.76rem;font-weight:700;border:1px solid var(--line);border-radius:99px;padding:.2rem .65rem;background:#fff;display:inline-flex;align-items:center;gap:.3rem}
+.mbrow{display:grid;grid-template-columns:5.2rem 1fr 6.4rem 2.6rem;gap:.4rem;align-items:center;font-size:.88rem;padding:.35rem 0}
+.mbl{font-weight:700}
+.mbt{position:relative;height:.8rem;display:block}
+.mbt b{position:absolute;left:0;height:.34rem;border-radius:3px;display:block}
+.mbt b.lvl{top:0} .mbt b.lvl2{top:.42rem}
+.mbv{font-weight:800;text-align:right;font-variant-numeric:tabular-nums}
+.minimap{width:100%;height:19rem}
+.mmleg{display:flex;gap:.8rem;font-size:.7rem;color:var(--muted)}
+
+/* ===== SCULPTOR ===== */
+.sculp{display:flex;flex-direction:column;gap:.9rem;height:100%}.srow1{flex:1;min-height:0}
+.srow1{display:grid;grid-template-columns:22rem 1fr;gap:.9rem}
+.counter{display:flex;align-items:center;gap:.9rem;margin:.4rem 0}
+.counter .n{font-weight:800;font-size:7rem;line-height:.9;letter-spacing:-.03em;color:var(--navy)}
+.filt{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
+.filt span{font-size:.82rem;font-weight:600;border:1px solid var(--line);background:var(--soft);border-radius:99px;padding:.15rem .6rem}
+.rangebig{position:relative;height:13.5rem;margin:auto 1rem}
+.rangebig .axis{position:absolute;left:0;right:0;top:8.8rem;height:.5rem;background:#E7EAEF;border-radius:9px}
+.rangebig .iqr{position:absolute;top:8.1rem;height:1.9rem;background:var(--lvl-cdmx);border-radius:.5rem;opacity:.9}
+.rangebig .iqrl{position:absolute;top:10.3rem;font-size:.95rem;font-weight:700;color:var(--lvl-cdmx);transform:translateX(-50%);white-space:nowrap}
+.mk{position:absolute;top:0;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;font-size:.9rem;font-weight:700}
+.mk b{font-size:3rem;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.mk::after{content:"";width:3px;height:4.5rem;background:currentColor;border-radius:2px;margin-top:.1rem}
+.mk.me{color:var(--navy)} .mk.ref{color:var(--gain)}
+.mk.me::before{content:"";order:3;width:1.2rem;height:1.2rem;border-radius:50%;background:var(--navy);border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);margin-top:-.6rem;position:relative}
+.rticks{margin-bottom:auto;display:flex;justify-content:space-between;margin:0 1rem;font-size:.85rem;color:var(--muted)}
+.srow2{flex:none;display:grid;grid-template-columns:1.3fr 1fr 1.1fr;gap:.9rem}
+.comps{display:grid;grid-template-columns:1fr;gap:.5rem}
+.comp{background:var(--soft);border-radius:12px;padding:1rem 1.1rem;display:grid;grid-template-columns:1fr auto;align-items:center;gap:0 .6rem}
+.comp .ch{font-size:1rem;display:flex;gap:.5rem}.comp .cbig{font-size:3.4rem;font-weight:800;grid-row:span 3;font-variant-numeric:tabular-nums;color:var(--text)}
+.reprow{display:grid;grid-template-columns:4.8rem 1fr 3rem 4rem;gap:.5rem;align-items:center;font-size:1rem;font-weight:600;padding:.6rem 0}
+.rt{height:.9rem;background:var(--soft);border-radius:3px;display:block}.rt b{display:block;height:100%;background:var(--lvl-cdmx);border-radius:3px}
+.dg{display:flex;align-items:center;gap:.7rem}
+.dg .n{font-size:3.8rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.coach{border:2px dotted #98A1AE;border-radius:var(--r);padding:.8rem 1rem;display:flex;flex-direction:column;gap:.5rem;background:#FAFBFC}
+.coach .lab{font-family:var(--f-mono);font-size:.8rem;color:var(--text);font-weight:500}
+
+/* ===== ESCENARIOS / METODOLOGIA / ESPERA ===== */
+.ttl{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;margin:.3rem 0 .8rem}
+.scen{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.sc{display:flex;flex-direction:column;gap:.9rem;padding:1.4rem;min-height:32rem}
+.sc .bubble{width:4rem;height:4rem;border-radius:18px;background:var(--soft);display:grid;place-items:center;color:var(--navy)}
+.sc .bubble .ic{width:2rem;height:2rem}
+.sc h3{font-size:1.9rem;font-weight:800;line-height:1.15;letter-spacing:-.02em}
+.sc p{color:var(--muted);font-size:1.15rem;line-height:1.5;flex:1}
+.pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:1.1rem}
+.step{position:relative;padding:1.2rem;display:flex;flex-direction:column;gap:.7rem;min-height:31rem}
+.step .bubble{width:3.4rem;height:3.4rem;border-radius:16px;background:var(--soft);color:var(--navy);display:grid;place-items:center}
+.step .bubble .ic{width:1.8rem;height:1.8rem}
+.step .n{position:absolute;top:1rem;right:1.2rem;font-weight:800;font-size:2.4rem;color:#D5DAE1}
+.step h3{font-size:1.5rem;font-weight:800;line-height:1.15}
+.step p{font-size:1.15rem;color:var(--muted);line-height:1.5}
+.step:not(:last-child)::after{content:"";position:absolute;right:-1.05rem;top:50%;width:.9rem;height:.9rem;border-top:3px solid #C3CAD3;border-right:3px solid #C3CAD3;transform:rotate(45deg)}
+.honest{margin-top:1.1rem;display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem}
+.honest div{border:1.5px dashed #C3CAD3;border-radius:var(--r);padding:1rem 1.2rem;font-size:.95rem;color:var(--muted);display:flex;gap:.7rem;align-items:flex-start}
+.honest .ic{color:var(--navy);width:1.5rem;height:1.5rem}
+.wait{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:.8rem;color:var(--muted)}
+.wait h3{font-size:2.4rem;color:var(--text);font-weight:800}
+.wait .ic{width:3.5rem;height:3.5rem}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-ball" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M6.5 5.5c2.5 3.5 2.5 9.5 0 13M17.5 5.5c-2.5 3.5-2.5 9.5 0 13"/></symbol>
+<symbol id="i-fall" viewBox="0 0 24 24"><path d="M6 6l12 12M18 8v10H8"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 17a8 8 0 1 1 16 0M12 17l4-5"/></symbol>
+<symbol id="i-spin" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-3-6.2M20 4v4h-4"/></symbol>
+<symbol id="i-mtn" viewBox="0 0 24 24"><path d="M3 19l6-11 4 7 3-4 5 8z"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 5L4 10l5 5M4 10h9a6 6 0 0 1 0 11h-4"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3l10 18H2zM12 10v5M12 18v.5"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 20V5M6 11l6-6 6 6"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+<symbol id="i-arm" viewBox="0 0 24 24"><path d="M4 20h16M4 20L16 7M11 20a7 7 0 0 0-2.2-5"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h10"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M16 16l5 5"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h14M14 4l4 4-4 4M20 16H6M10 12l-4 4 4 4"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M5 20V11M11 20V4M17 20v-7M2 20h20"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12c3-7 6-7 9 0s6 7 9 0"/></symbol>
+<symbol id="i-split" viewBox="0 0 24 24"><path d="M12 3v8M12 11l-6 10M12 11l6 10"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.5 2.5-5.5 6-5.5s6 2 6 5.5M16 5.5a3 3 0 0 1 0 5.5M18 14.7c2 .6 3 2.3 3 5.3"/></symbol>
+<symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/></symbol>
+</defs></svg>
+
+<div class="top">
+  <div class="wm"><div class="d">D</div>Diablos <span>AeroVision</span></div>
+  <nav>
+    <button class="on" data-t="sim"><svg class="ic "><use href="#i-ball"/></svg>Simulador</button>
+    <button data-t="map" class="dis"><svg class="ic "><use href="#i-layers"/></svg>Mapa <span class="soon">PRONTO</span></button>
+    <button data-t="lb"><svg class="ic "><use href="#i-chart"/></svg>Leaderboard</button>
+    <button data-t="sculp"><svg class="ic "><use href="#i-target"/></svg>Sculptor</button>
+    <button data-t="esc"><svg class="ic "><use href="#i-users"/></svg>Escenarios</button>
+    <button data-t="met"><svg class="ic "><use href="#i-flask"/></svg>Metodología</button>
+    <button data-t="velo" class="dis"><svg class="ic "><use href="#i-clock"/></svg>VeloVision <span class="soon">EN ESPERA</span></button>
+  </nav>
+  <div class="spacer"></div>
+  <div class="tools">
+    <span class="tbtn"><svg class="ic "><use href="#i-home"/></svg>Promedio LMB</span>
+    <span class="tbtn"><svg class="ic "><use href="#i-book"/></svg>Glosario</span>
+    <span class="tbtn">Modo Presentación<i class="tgl"></i></span>
+  </div>
+</div>
+
+<div class="sub">
+  <div class="crumb"><svg class="ic "><use href="#i-ball"/></svg><b>pitcher_01050</b> (Derecho)<i></i>Four-Seam<i></i><svg class="ic "><use href="#i-mtn"/></svg>Entorno: <b>Estadio Harp Helú (CDMX)</b></div>
+  <div class="anc" aria-label="Validación en 3 holdouts frente a CountBaselineModel (reducción de RMSE de xrv_pitcher, Pitching+)">
+    <span class="ap" title="Holdout Pitcher: reducción de RMSE vs CountBaselineModel, media de 5 folds"><svg class="ic "><use href="#i-shield"/></svg>Pitcher <b>4.50%</b></span>
+    <span class="ap" title="Holdout Season: reducción de RMSE vs CountBaselineModel"><svg class="ic "><use href="#i-shield"/></svg>Season <b>4.77%</b></span>
+    <span class="ap" title="Holdout Park: reducción de RMSE vs CountBaselineModel"><svg class="ic "><use href="#i-shield"/></svg>Park <b>4.14%</b></span>
+    <span class="ap" title="Estabilidad año a año de Pitching+, n = 202, en muestra 2024–25"><svg class="ic "><use href="#i-spin"/></svg>Año a año <b>r 0.60</b></span>
+  </div>
+  <div class="spacer"></div>
+  <span class="pill">2026 fuera de muestra</span>
+  <button class="btn"><svg class="ic "><use href="#i-undo"/></svg>Revertir cambios</button>
+</div>
+
+<main>
+<!-- ============ SIMULADOR ============ -->
+<section class="screen on" id="sim">
+ <div class="simmain" id="simmain">
+  <div class="card rail">
+    <h3><svg class="ic "><use href="#i-flask"/></svg>Asistente de Simulación</h3>
+    <div class="presets">
+      <div class="pc on"><svg class="ic "><use href="#i-up"/></svg>Recta alta</div>
+      <div class="pc"><svg class="ic "><use href="#i-wave"/></svg>Sweeper</div>
+      <div class="pc"><svg class="ic "><use href="#i-split"/></svg>Splitter resiliente</div>
+    </div>
+    <div class="sl"><div class="slt"><svg class="ic "><use href="#i-gauge"/></svg><span>Velocidad</span><b>91.9<small>mph</small></b></div><div class="track" title="Zona LMB: p10 a p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches: 88.5 a 94.4 mph"><i class="zona" style="left:58.8%;width:14.6%"></i><u style="left:67.3%"></u></div></div><div class="sl"><div class="slt"><svg class="ic "><use href="#i-spin"/></svg><span>Giro</span><b>2582<small>rpm</small></b></div><div class="track" title="Zona LMB: p10 a p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches: 2160 a 2489 rpm"><i class="zona" style="left:53.6%;width:10.6%"></i><u style="left:67.1%"></u></div></div><div class="sl"><div class="slt"><svg class="ic "><use href="#i-up"/></svg><span>Subida (IVB)</span><b>16.1<small>in</small></b></div><div class="track" title="Zona LMB: p10 a p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches: 13.5 a 18.8 in"><i class="zona" style="left:69.9%;width:9.8%"></i><u style="left:74.7%"></u></div></div><div class="sl"><div class="slt"><svg class="ic "><use href="#i-right"/></svg><span>Corrida (HB)</span><b>16.5<small>in</small></b></div><div class="track" title="Zona LMB: p10 a p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches: 5.1 a 12.4 in"><i class="zona" style="left:60.1%;width:14.6%"></i><u style="left:82.9%"></u></div></div><div class="sl"><div class="slt"><svg class="ic "><use href="#i-arm"/></svg><span>Arm slot</span><b>29.7<small>°</small></b></div><div class="track" title="Zona LMB: p10 a p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches: 28.6 a 56.3 °"><i class="zona" style="left:31.8%;width:30.8%"></i><u style="left:33.0%"></u></div></div>
+    <div class="zleg"><i></i>Zona LMB: p10–p90 real de la liga para Four-Seam</div>
+    <div class="note">Zona LMB = p10–p90 real de 969 filas Four-Seam (n_pitches ≥ 50), ponderado por n_pitches. Fuente: pitcher_arsenal_breakdown.csv.</div>
+    <button class="btn primary block"><svg class="ic "><use href="#i-search"/></svg>Buscar pares reales para este pitcheo</button>
+  </div>
+
+  <div class="rightcol">
+    <div class="verdict warn">
+      <svg class="ic "><use href="#i-warn"/></svg>
+      <div><p>Veredicto en CDMX: tu recta pierde <b>2.5 in</b> de subida y <b>2.6 in</b> de corrida por el aire delgado; su Stuff+ baja de <b>102.1</b> a <b>100.9</b>.</p><div class="ref"><svg class="ic "><use href="#i-bulb"/></svg><span>Referencia: los 39 pares reales con tu mecánica sostienen mejor el <b>Slider</b> (Stuff+ CDMX mediano <b>101.3</b>).</span><span class="tag">observado en pares reales, no causal</span></div></div>
+    </div>
+    <div class="cards3">
+      <div class="card big">
+        <div class="hd"><svg class="ic "><use href="#i-home"/></svg>Nivel del mar<span class="pill">ρ̂ = 1.000</span></div>
+        <div class="stf"><div class="n">102.1</div><div class="l">Stuff+</div></div>
+        <div class="gauge"><div class="gt"><span>vs promedio LMB (100)</span><b class="gain">▲ +2.1</b></div><div class="gtrack"><i style="left:50.0%"></i><u style="left:67.7%"></u></div></div>
+        <div class="mini2">
+          <div class="mini"><span class="t"><svg class="ic "><use href="#i-up"/></svg>Subida (IVB)</span><span class="v">16.1<small>in</small></span></div>
+          <div class="mini"><span class="t"><svg class="ic "><use href="#i-right"/></svg>Corrida (HB)</span><span class="v">16.5<small>in</small></span></div>
+        </div>
+        <div class="chips2"><span>Location+ <b>100.6</b></span><span>Pitching+ <b>101.4</b></span></div>
+      </div>
+      <div class="card big">
+        <div class="hd"><svg class="ic "><use href="#i-mtn"/></svg>Estadio Harp Helú<span class="pill">ρ̂ = 0.8518</span></div>
+        <div class="stf"><div class="n">100.9</div><div><span class="dpill loss">▼ −1.28</span><div class="l" style="margin:.3rem 0 0">Stuff+ CDMX</div></div></div>
+        <div class="gauge"><div class="gt"><span>vs promedio LMB (100)</span><b class="gain">▲ +0.9</b></div><div class="gtrack"><i style="left:50.0%"></i><u style="left:57.1%"></u></div></div>
+        <div class="mini2">
+          <div class="mini"><span class="t"><svg class="ic "><use href="#i-up"/></svg>Subida (IVB)</span><span class="v">13.5<small>in</small></span><span class="dpill loss" style="align-self:flex-start">▼ −2.5</span></div>
+          <div class="mini"><span class="t"><svg class="ic "><use href="#i-right"/></svg>Corrida (HB)</span><span class="v">13.8<small>in</small></span><span class="dpill loss" style="align-self:flex-start">▼ −2.6</span></div>
+        </div>
+        <div class="chips2"><span>Location+ <b>100.6</b></span><span>Pitching+ <b>99.0</b></span></div>
+      </div>
+      <div class="card diagcard">
+        <h4><svg class="ic "><use href="#i-fall"/></svg>Diagnóstico visual</h4>
+        <svg viewBox="0 0 320 340" class="diag" role="img" aria-label="Pelota a nivel del mar y en CDMX sobre retícula IVB por HB"><line x1="38.0" y1="14" x2="38.0" y2="304" class="gl"/><text x="38.0" y="317" class="ax" text-anchor="middle">11</text><line x1="106.0" y1="14" x2="106.0" y2="304" class="gl"/><text x="106.0" y="317" class="ax" text-anchor="middle">13</text><line x1="174.0" y1="14" x2="174.0" y2="304" class="gl"/><text x="174.0" y="317" class="ax" text-anchor="middle">15</text><line x1="242.0" y1="14" x2="242.0" y2="304" class="gl"/><text x="242.0" y="317" class="ax" text-anchor="middle">17</text><line x1="310.0" y1="14" x2="310.0" y2="304" class="gl"/><text x="310.0" y="317" class="ax" text-anchor="middle">19</text><line x1="38" y1="304.0" x2="310" y2="304.0" class="gl"/><text x="32" y="307.0" class="ax" text-anchor="end">11</text><line x1="38" y1="221.1" x2="310" y2="221.1" class="gl"/><text x="32" y="224.1" class="ax" text-anchor="end">13</text><line x1="38" y1="138.3" x2="310" y2="138.3" class="gl"/><text x="32" y="141.3" class="ax" text-anchor="end">15</text><line x1="38" y1="55.4" x2="310" y2="55.4" class="gl"/><text x="32" y="58.4" class="ax" text-anchor="end">17</text><text x="174" y="334" class="ax2" text-anchor="middle">Corrida HB (in) →</text><text transform="translate(9 159) rotate(-90)" class="ax2" text-anchor="middle">Subida IVB (in) →</text><line x1="223.7" y1="105.3" x2="223.7" y2="198.5" class="comp"/><line x1="223.7" y1="198.5" x2="146.5" y2="198.5" class="comp"/><defs><marker id="ah2" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--loss)"/></marker></defs><line x1="215.3" y1="103.2" x2="143.6" y2="187.8" stroke="var(--loss)" stroke-width="2.4" stroke-dasharray="1 5" stroke-linecap="round" marker-end="url(#ah2)"/><g transform="translate(223.7 93.3)"><circle r="12" fill="#fff" stroke="var(--navy)" stroke-width="2.2"/><path d="M-7 -8c3 4 3 12 0 16M7 -8c-3 4 -3 12 0 16" fill="none" stroke="var(--navy)" stroke-width="1.2" opacity=".7"/></g><g transform="translate(134.5 198.5)"><circle r="12" fill="#fff" stroke="var(--loss)" stroke-width="2.2" stroke-dasharray="3 3"/><path d="M-7 -8c3 4 3 12 0 16M7 -8c-3 4 -3 12 0 16" fill="none" stroke="var(--loss)" stroke-width="1.2" opacity=".7"/></g><text x="239.7" y="87.3" class="lb" style="fill:var(--navy)">Nivel del mar</text><text x="118.5" y="202.5" class="lb" text-anchor="end" style="fill:var(--loss)">CDMX</text><text x="231.7" y="159.9" class="lb2" text-anchor="start">−2.5 in</text><text x="185.1" y="216.5" class="lb2" text-anchor="middle">−2.6 in</text></svg>
+        <div class="note">Caída por aire delgado: <b class="loss">−2.5 in</b> de subida. Retícula IVB × HB; punteado = posición en CDMX.</div>
+      </div>
+    </div>
+    <div class="exp" id="exp">
+      <button class="exptoggle" id="exptoggle"><svg class="ic "><use href="#i-chart"/></svg>Ver desglose estadístico avanzado y SHAP (Modo Analista)<span class="pill">cerrado</span><svg class="ic ch"><use href="#i-chev"/></svg></button>
+    </div>
+  </div>
+ </div>
+
+ <div id="analyst">
+   <div class="bds"><span class="bd">modelo: StuffPlusModel (HACK-010)</span><span class="bd">fuente: pitcher_arsenal_breakdown.csv</span><span class="bd">ρ̂ = 0.8518</span><span class="bd">2026 fuera de muestra</span><span class="bd">pitcher pitcher_01050 · 2024 · Four-Seam · n = 388</span></div>
+   <div class="mid3">
+     <div class="card"><div class="ph"><h4>Movimiento sobre la liga</h4><span class="bd">fuente: movement_map_grid.csv</span></div><div class="plane"><svg viewBox="0 0 320 270" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Plano de movimiento IVB por HB con densidad de la liga"><line x1="43.3" y1="8" x2="43.3" y2="244" class="gl"/><text x="43.3" y="258" class="ax" text-anchor="middle">-5</text><line x1="89.6" y1="8" x2="89.6" y2="244" class="gl"/><text x="89.6" y="258" class="ax" text-anchor="middle">0</text><line x1="135.9" y1="8" x2="135.9" y2="244" class="gl"/><text x="135.9" y="258" class="ax" text-anchor="middle">5</text><line x1="182.3" y1="8" x2="182.3" y2="244" class="gl"/><text x="182.3" y="258" class="ax" text-anchor="middle">10</text><line x1="228.6" y1="8" x2="228.6" y2="244" class="gl"/><text x="228.6" y="258" class="ax" text-anchor="middle">15</text><line x1="274.9" y1="8" x2="274.9" y2="244" class="gl"/><text x="274.9" y="258" class="ax" text-anchor="middle">20</text><line x1="34" y1="214.5" x2="312" y2="214.5" class="gl"/><text x="29" y="217.5" class="ax" text-anchor="end">0</text><line x1="34" y1="177.6" x2="312" y2="177.6" class="gl"/><text x="29" y="180.6" class="ax" text-anchor="end">5</text><line x1="34" y1="140.8" x2="312" y2="140.8" class="gl"/><text x="29" y="143.8" class="ax" text-anchor="end">10</text><line x1="34" y1="103.9" x2="312" y2="103.9" class="gl"/><text x="29" y="106.9" class="ax" text-anchor="end">15</text><line x1="34" y1="67.0" x2="312" y2="67.0" class="gl"/><text x="29" y="70.0" class="ax" text-anchor="end">20</text><line x1="34" y1="30.1" x2="312" y2="30.1" class="gl"/><text x="29" y="33.1" class="ax" text-anchor="end">25</text><rect x="-21.6" y="258.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="52.5" y="258.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.17"/><rect x="-21.6" y="244.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-3.1" y="244.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="15.5" y="244.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="34.0" y="244.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="52.5" y="244.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="-3.1" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.17"/><rect x="15.5" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="34.0" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.19"/><rect x="52.5" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="89.6" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="108.1" y="229.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-3.1" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.17"/><rect x="15.5" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.19"/><rect x="34.0" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="52.5" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="89.6" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="126.7" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.17"/><rect x="145.2" y="214.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-58.7" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-40.1" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="15.5" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="34.0" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.24"/><rect x="52.5" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="71.1" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="89.6" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.27"/><rect x="108.1" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="126.7" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="145.2" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="163.7" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="200.8" y="199.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-58.7" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-40.1" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="-21.6" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="-3.1" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="15.5" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="34.0" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.28"/><rect x="52.5" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.33"/><rect x="71.1" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.42"/><rect x="89.6" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.46"/><rect x="108.1" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.37"/><rect x="126.7" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.29"/><rect x="145.2" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="163.7" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="182.3" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.26"/><rect x="200.8" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="219.3" y="185.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="15.5" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="34.0" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.30"/><rect x="52.5" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.46"/><rect x="71.1" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.54"/><rect x="89.6" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.56"/><rect x="108.1" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.54"/><rect x="126.7" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.47"/><rect x="145.2" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.40"/><rect x="163.7" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.39"/><rect x="182.3" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.39"/><rect x="200.8" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.37"/><rect x="219.3" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.32"/><rect x="237.9" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="256.4" y="170.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="-3.1" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="15.5" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="34.0" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.37"/><rect x="52.5" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.52"/><rect x="71.1" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.60"/><rect x="89.6" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.63"/><rect x="108.1" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.64"/><rect x="126.7" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.63"/><rect x="145.2" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.59"/><rect x="163.7" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.57"/><rect x="182.3" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.55"/><rect x="200.8" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.50"/><rect x="219.3" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.42"/><rect x="237.9" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.33"/><rect x="256.4" y="155.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="-21.6" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="-3.1" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="15.5" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="34.0" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.38"/><rect x="52.5" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.54"/><rect x="71.1" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.62"/><rect x="89.6" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.67"/><rect x="108.1" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.71"/><rect x="126.7" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.73"/><rect x="145.2" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.74"/><rect x="163.7" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.73"/><rect x="182.3" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.69"/><rect x="200.8" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.62"/><rect x="219.3" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.52"/><rect x="237.9" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.44"/><rect x="256.4" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.31"/><rect x="274.9" y="140.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="-21.6" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="-3.1" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="15.5" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="34.0" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.39"/><rect x="52.5" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.51"/><rect x="71.1" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.62"/><rect x="89.6" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.70"/><rect x="108.1" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.76"/><rect x="126.7" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.81"/><rect x="145.2" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.84"/><rect x="163.7" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.85"/><rect x="182.3" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.81"/><rect x="200.8" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.73"/><rect x="219.3" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.63"/><rect x="237.9" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.53"/><rect x="256.4" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.38"/><rect x="274.9" y="126.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.19"/><rect x="-40.1" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="-21.6" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.27"/><rect x="-3.1" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="15.5" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="34.0" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.34"/><rect x="52.5" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.48"/><rect x="71.1" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.60"/><rect x="89.6" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.71"/><rect x="108.1" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.79"/><rect x="126.7" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.84"/><rect x="145.2" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.88"/><rect x="163.7" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.90"/><rect x="182.3" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.87"/><rect x="200.8" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.80"/><rect x="219.3" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.71"/><rect x="237.9" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.60"/><rect x="256.4" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.46"/><rect x="274.9" y="111.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.27"/><rect x="-58.7" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="-40.1" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.20"/><rect x="-21.6" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.24"/><rect x="-3.1" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="15.5" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.27"/><rect x="34.0" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.30"/><rect x="52.5" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.46"/><rect x="71.1" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.58"/><rect x="89.6" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.70"/><rect x="108.1" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.78"/><rect x="126.7" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.85"/><rect x="145.2" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.89"/><rect x="163.7" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.90"/><rect x="182.3" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.88"/><rect x="200.8" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.83"/><rect x="219.3" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.75"/><rect x="237.9" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.64"/><rect x="256.4" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.52"/><rect x="274.9" y="96.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.32"/><rect x="-58.7" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="-40.1" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="-21.6" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.19"/><rect x="-3.1" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="15.5" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="34.0" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.33"/><rect x="52.5" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.43"/><rect x="71.1" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.56"/><rect x="89.6" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.66"/><rect x="108.1" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.75"/><rect x="126.7" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.82"/><rect x="145.2" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.86"/><rect x="163.7" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.87"/><rect x="182.3" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.86"/><rect x="200.8" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.83"/><rect x="219.3" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.76"/><rect x="237.9" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.66"/><rect x="256.4" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.51"/><rect x="274.9" y="81.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.33"/><rect x="-3.1" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="15.5" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.21"/><rect x="34.0" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.24"/><rect x="52.5" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.39"/><rect x="71.1" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.50"/><rect x="89.6" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.61"/><rect x="108.1" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.70"/><rect x="126.7" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.76"/><rect x="145.2" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.80"/><rect x="163.7" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.82"/><rect x="182.3" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.82"/><rect x="200.8" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.79"/><rect x="219.3" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.71"/><rect x="237.9" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.60"/><rect x="256.4" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.44"/><rect x="274.9" y="67.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.26"/><rect x="-3.1" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="15.5" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.14"/><rect x="34.0" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="52.5" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.26"/><rect x="71.1" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.40"/><rect x="89.6" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.54"/><rect x="108.1" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.63"/><rect x="126.7" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.70"/><rect x="145.2" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.74"/><rect x="163.7" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.76"/><rect x="182.3" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.75"/><rect x="200.8" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.69"/><rect x="219.3" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.60"/><rect x="237.9" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.46"/><rect x="256.4" y="52.2" width="17.9" height="14.2" fill="var(--density)" opacity="0.27"/><rect x="15.5" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="52.5" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><rect x="71.1" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.35"/><rect x="89.6" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.45"/><rect x="108.1" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.55"/><rect x="126.7" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.61"/><rect x="145.2" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.65"/><rect x="163.7" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.65"/><rect x="182.3" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.62"/><rect x="200.8" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.54"/><rect x="219.3" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.42"/><rect x="237.9" y="37.5" width="17.9" height="14.2" fill="var(--density)" opacity="0.25"/><rect x="71.1" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="89.6" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.33"/><rect x="108.1" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.41"/><rect x="126.7" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.45"/><rect x="145.2" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.50"/><rect x="163.7" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.47"/><rect x="182.3" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.41"/><rect x="200.8" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.31"/><rect x="219.3" y="22.8" width="17.9" height="14.2" fill="var(--density)" opacity="0.15"/><rect x="108.1" y="8.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.23"/><rect x="126.7" y="8.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.24"/><rect x="145.2" y="8.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.22"/><rect x="163.7" y="8.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.18"/><rect x="200.8" y="8.0" width="17.9" height="14.2" fill="var(--density)" opacity="0.12"/><text x="173.0" y="269" class="ax" text-anchor="middle">HB normalizado (in)</text><text transform="translate(8 126.0) rotate(-90)" class="ax" text-anchor="middle">IVB (in)</text><defs><marker id="ah" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--loss)"/></marker></defs><line x1="242.2" y1="95.9" x2="220.8" y2="111.6" stroke="var(--loss)" stroke-width="2" marker-end="url(#ah)"/><circle cx="242.2" cy="95.9" r="5" fill="var(--bg0)" stroke="var(--text)" stroke-width="2"/><polygon points="217.8,106.6 219.8,111.9 225.5,112.1 221.0,115.6 222.5,121.1 217.8,118.0 213.1,121.1 214.7,115.6 210.2,112.1 215.9,111.9" fill="var(--loss)" stroke="var(--bg0)" stroke-width="1"/><text x="251.2" y="89.9" class="lb">○ Nivel del mar</text><text x="227.8" y="128.6" class="lb" style="fill:var(--loss)">★ Harp Helú</text></svg></div><div class="note">Densidad: celdas de 2 in con n ≥ 5 de la familia Four-Seam. ○ nivel del mar → ★ CDMX.</div></div>
+     <div class="card"><div class="ph"><h4>Qué empuja el Stuff+ CDMX</h4><span class="bd">explain_pitch</span></div><div class="shrow"><span class="shl">Dif. velocidad vs recta</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:4.9%;width:66.5%"></b></span><span class="shv loss">▼ −9.31</span></div><div class="shrow"><span class="shl">Túnel a 170 ms</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:47.6%;width:23.8%"></b></span><span class="shv loss">▼ −3.33</span></div><div class="shrow"><span class="shl">Distancia túnel 170 ms</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:49.2%;width:22.2%"></b></span><span class="shv loss">▼ −3.11</span></div><div class="shrow"><span class="shl">Ángulo horiz. de soltura</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar gain" style="left:71.4%;width:20.9%"></b></span><span class="shv gain">▲ +2.93</span></div><div class="shrow"><span class="shl">Ángulo vert. de soltura</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar gain" style="left:71.4%;width:15.6%"></b></span><span class="shv gain">▲ +2.19</span></div><div class="shrow"><span class="shl">Túnel en la soltura</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:64.6%;width:6.9%"></b></span><span class="shv loss">▼ −0.96</span></div><div class="shrow"><span class="shl">Lado de soltura</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:66.0%;width:5.4%"></b></span><span class="shv loss">▼ −0.76</span></div><div class="shrow"><span class="shl">Quiebre horizontal</span><span class="shtrack"><i class="zero" style="left:71.4%"></i><b class="bar loss" style="left:68.9%;width:2.5%"></b></span><span class="shv loss">▼ −0.35</span></div>
+       <div class="note ill" style="margin-top:.5rem"><b>[ejemplo ilustrativo]</b> Magnitudes reales de <span style="font-family:var(--f-mono)">StuffPlusModel.explain_pitch</span>, pero sobre un pitcheo reconstruido con valores por defecto del simulador (suma 85.9, no coincide con el catálogo). ▲ suma, ▼ resta.</div></div>
+     <div class="card"><div class="ph"><h4>Qué esperamos del pitcheo</h4><span class="bd">stuff_plus_scores_by_pitch.parquet</span></div>
+       <div class="plhead"><span>Resultado esperado</span><span></span><span style="text-align:right">Mar</span><span style="text-align:center">CDMX</span></div><div class="plrow"><span class="pll">Swing y falla<small>exp_target_whiff</small></span><span class="pltrack"><b style="width:38.2%"></b></span><span class="plv num">9.6%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Persigue fuera de zona<small>exp_target_chase</small></span><span class="pltrack"><b style="width:74.8%"></b></span><span class="plv num">18.7%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Strike cantado<small>exp_target_called_strike</small></span><span class="pltrack"><b style="width:82.2%"></b></span><span class="plv num">20.6%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Bola al suelo<small>exp_target_groundball</small></span><span class="pltrack"><b style="width:35.6%"></b></span><span class="plv num">8.9%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Contacto débil<small>exp_target_weak_contact</small></span><span class="pltrack"><b style="width:32.3%"></b></span><span class="plv num">8.1%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Contacto fuerte<small>exp_target_hard_contact</small></span><span class="pltrack"><b style="width:17.2%"></b></span><span class="plv num">4.3%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div><div class="plrow"><span class="pll">Out en el pitcheo<small>exp_target_out_on_pitch</small></span><span class="pltrack"><b style="width:69.0%"></b></span><span class="plv num">17.2%</span><span class="plc na" title="Sin variante CDMX en el parquet">pend.</span></div>
+       <div class="note ill" style="margin-top:.4rem">Media de 388 pitcheos de pitcher_01050 · 2024 · Four-Seam. El parquet trae <b>una sola versión</b> de exp_* (sin variante CDMX ni etiqueta de densidad): CDMX pendiente. No hay columnas de bola, foul ni en juego. xRV esperado: <b>+0.0147</b>.</div></div>
+   </div>
+   <div class="card">
+     <div class="ph"><h4>Descomposición de altitud en 3 términos · población de la liga</h4><div class="bds"><span class="bd">fuente: channel_decomposition.csv</span><span class="bd">n = 778 pitchers pareados</span></div></div>
+     <div class="dtot"><span class="mut sm">Total observado (xRV/pitcheo)</span><span class="num">−0.01413</span><span class="mut sm">IC95 [−0.01687, −0.01172]</span></div>
+     <div class="stack"><b class="s1" style="width:2.43%"></b><b class="s2" style="width:42.46%"></b><b class="s3" style="width:55.11%"></b></div><div class="dleg"><div><i class="sw s1"></i><span><strong>Canal Stuff</strong> <em class="num">−0.00034</em> xRV/pitcheo · 2.4 % · IC95 [−0.00043, −0.00025]</span></div><div><i class="sw s2"></i><span><strong>Canal Parque en bolas en juego</strong> <em class="num">−0.00600</em> · 42.5 % · IC95 [−0.00788, −0.00402]</span></div><div><i class="sw s3"></i><span><strong>Residuo no atribuido (no se atribuye a ningún canal)</strong> <em class="num">−0.00779</em> · 55.1 % · IC95 [−0.00951, −0.00612]</span></div></div>
+     <div class="note" style="margin-top:.4rem">Estimación poblacional de la liga, no una partición causal del pitcheo simulado. El residuo nunca se suma al Canal Parque.</div>
+   </div>
+   <div class="card"><div class="ph"><h4>Validación frente a CountBaselineModel</h4><span class="bd">fuente: holdout_metrics.csv · year_to_year_stability.csv</span></div>
+     <div class="valid"><div><b>▲ 4.50%</b>Holdout Pitcher · RMSE de xrv_pitcher, media de 5 folds</div><div><b>▲ 4.77%</b>Holdout Season</div><div><b>▲ 4.14%</b>Holdout Park</div><div><b style="color:var(--neutral)">r = 0.60</b>Año a año · Pitching+ · Spearman 0.61 · n = 202 · en muestra 2024–25</div></div></div>
+ </div>
+</section>
+
+<section class="screen" id="map"><div class="wait"><svg class="ic "><use href="#i-layers"/></svg><h3>Mapa LMB</h3><span class="bd">PRÓXIMAMENTE</span></div></section>
+
+<!-- ============ LEADERBOARD ============ -->
+<section class="screen" id="lb">
+ <div class="lbwrap">
+  <div class="lbleft">
+   <div class="card">
+    <div class="ph"><div class="filters"><span class="fchip on"><svg class="ic "><use href="#i-chart"/></svg>ΔStuff+ CDMX ↑</span><span class="fchip">Todas las temporadas</span><span class="fchip">Ambas manos</span><span class="fchip">n ≥ 700</span></div>
+      <div class="bds"><span class="bd">fuente: pitcher_season_leaderboard.csv</span><span class="bd">Δ = CDMX − mar</span><span class="bd">ρ̂ = 0.8518</span><span class="bd">2026 fuera de muestra</span></div></div>
+    <table>
+      <thead><tr><th>#</th><th>Lanzador</th><th>N</th><th>Stuff+ mar</th><th>Stuff+ CDMX</th><th>ΔStuff+</th><th>±</th><th>Pitching+</th><th>Carr./100</th></tr></thead>
+      <tbody><tr class=""><td class="mut">1</td><td class="pn">pitcher_00602<small> 2025 · Z</small></td><td class="n">760</td><td class="bc"><span class="v">101.9</span><span class="cellbar"><b class="lvl" style="width:73.5%"></b></span></td><td class="bc"><span class="v">101.1</span><span class="cellbar"><b class="lvl2" style="width:63.3%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.82</span><span class="dbar"><i></i><b class="loss" style="left:16.0%;width:34.0%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">99.1</td><td class="n">0.00</td></tr><tr class=""><td class="mut">2</td><td class="pn">pitcher_00069<small> 2025 · D</small></td><td class="n">807</td><td class="bc"><span class="v">101.2</span><span class="cellbar"><b class="lvl" style="width:64.7%"></b></span></td><td class="bc"><span class="v">100.4</span><span class="cellbar"><b class="lvl2" style="width:54.7%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.80</span><span class="dbar"><i></i><b class="loss" style="left:16.7%;width:33.3%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">100.5</td><td class="n">+1.26</td></tr><tr class=""><td class="mut">3</td><td class="pn">pitcher_00533<small> 2024 · D</small></td><td class="n">778</td><td class="bc"><span class="v">102.6</span><span class="cellbar"><b class="lvl" style="width:82.0%"></b></span></td><td class="bc"><span class="v">101.9</span><span class="cellbar"><b class="lvl2" style="width:73.9%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.65</span><span class="dbar"><i></i><b class="loss" style="left:22.9%;width:27.1%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">98.9</td><td class="n">+1.76</td></tr><tr class=""><td class="mut">4</td><td class="pn">pitcher_00332<small> 2025 · Z</small></td><td class="n">705</td><td class="bc"><span class="v">101.8</span><span class="cellbar"><b class="lvl" style="width:72.3%"></b></span></td><td class="bc"><span class="v">101.1</span><span class="cellbar"><b class="lvl2" style="width:64.3%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.64</span><span class="dbar"><i></i><b class="loss" style="left:23.3%;width:26.7%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">100.1</td><td class="n">+1.75</td></tr><tr class="sel"><td class="mut">5</td><td class="pn">pitcher_01050<small> 2024 · D</small></td><td class="n">796</td><td class="bc"><span class="v">99.6</span><span class="cellbar"><b class="lvl" style="width:45.2%"></b></span></td><td class="bc"><span class="v">99.0</span><span class="cellbar"><b class="lvl2" style="width:37.4%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.63</span><span class="dbar"><i></i><b class="loss" style="left:23.8%;width:26.2%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">99.4</td><td class="n">+2.76</td></tr><tr class=""><td class="mut">6</td><td class="pn">pitcher_00516<small> 2024 · D</small></td><td class="n">806</td><td class="bc"><span class="v">98.9</span><span class="cellbar"><b class="lvl" style="width:36.5%"></b></span></td><td class="bc"><span class="v">98.3</span><span class="cellbar"><b class="lvl2" style="width:28.9%"></b></span></td><td class="dc"><span class="dpill loss">▼ −0.61</span><span class="dbar"><i></i><b class="loss" style="left:24.7%;width:25.3%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">97.9</td><td class="n">−0.84</td></tr><tr class="gap"><td colspan="10">⋯ 243 filas intermedias ⋯</td></tr><tr class=""><td class="mut">250</td><td class="pn">pitcher_00426<small> 2025 · Z</small></td><td class="n">708</td><td class="bc"><span class="v">99.9</span><span class="cellbar"><b class="lvl" style="width:48.9%"></b></span></td><td class="bc"><span class="v">100.5</span><span class="cellbar"><b class="lvl2" style="width:55.7%"></b></span></td><td class="dc"><span class="dpill gain">▲ +0.55</span><span class="dbar"><i></i><b class="gain" style="left:50.0%;width:22.8%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">98.6</td><td class="n">−0.65</td></tr><tr class=""><td class="mut">251</td><td class="pn">pitcher_00071<small> 2025 · Z</small></td><td class="n">829</td><td class="bc"><span class="v">100.9</span><span class="cellbar"><b class="lvl" style="width:61.9%"></b></span></td><td class="bc"><span class="v">101.6</span><span class="cellbar"><b class="lvl2" style="width:70.3%"></b></span></td><td class="dc"><span class="dpill gain">▲ +0.68</span><span class="dbar"><i></i><b class="gain" style="left:50.0%;width:28.3%"></b></span></td><td class="pend" title="Sin IC por pitcher hoy">± pendiente</td><td class="n">99.6</td><td class="n">+0.41</td></tr></tbody>
+    </table>
+    <div class="legend" style="margin-top:.5rem"><span class="loss">▼ pierde</span><span class="neu">● sin cambio (|Δ| &lt; 0.20)</span><span class="gain">▲ gana</span><span>251 filas con n ≥ 700 · ± pendiente: no hay IC por pitcher</span></div>
+   </div>
+   <div class="card" style="flex:1;display:flex;flex-direction:column">
+     <div class="ph"><h4>Distribución de ΔStuff+ CDMX en la liga</h4><span class="bd">251 temporadas-lanzador</span></div>
+     <svg viewBox="0 0 1000 250" class="hist" role="img" aria-label="Distribución de ΔStuff+ CDMX"><rect x="11.0" y="223.8" width="55.6" height="4.2" rx="2" class="hb loss"/><rect x="68.6" y="223.8" width="55.6" height="4.2" rx="2" class="hb loss"/><rect x="126.3" y="211.0" width="55.6" height="17.0" rx="2" class="hb loss"/><rect x="183.9" y="189.8" width="55.6" height="38.2" rx="2" class="hb loss"/><rect x="241.6" y="155.9" width="55.6" height="72.1" rx="2" class="hb loss"/><rect x="299.2" y="134.7" width="55.6" height="93.3" rx="2" class="hb loss"/><rect x="356.9" y="147.4" width="55.6" height="80.6" rx="2" class="hb loss"/><rect x="414.5" y="113.5" width="55.6" height="114.5" rx="2" class="hb neu"/><rect x="472.2" y="66.9" width="55.6" height="161.1" rx="2" class="hb neu"/><rect x="529.8" y="16.0" width="55.6" height="212.0" rx="2" class="hb neu"/><rect x="587.5" y="75.4" width="55.6" height="152.6" rx="2" class="hb neu"/><rect x="645.1" y="155.9" width="55.6" height="72.1" rx="2" class="hb gain"/><rect x="702.8" y="215.3" width="55.6" height="12.7" rx="2" class="hb gain"/><rect x="760.4" y="211.0" width="55.6" height="17.0" rx="2" class="hb gain"/><rect x="818.1" y="219.5" width="55.6" height="8.5" rx="2" class="hb gain"/><rect x="875.7" y="223.8" width="55.6" height="4.2" rx="2" class="hb gain"/><rect x="933.4" y="228.0" width="55.6" height="0.0" rx="2" class="hb gain"/><line x1="175.6" y1="6" x2="175.6" y2="228" stroke="var(--navy)" stroke-width="2"/><text x="180.6" y="14" class="lb" style="fill:var(--navy)">pitcher_01050 −0.63</text><line x1="561.2" y1="20" x2="561.2" y2="228" class="gl2"/><text x="71.2" y="242" class="ax" text-anchor="middle">−0.8</text><text x="316.2" y="242" class="ax" text-anchor="middle">−0.4</text><text x="561.2" y="242" class="ax" text-anchor="middle">0</text><text x="806.2" y="242" class="ax" text-anchor="middle">+0.4</text><text x="1051.2" y="242" class="ax" text-anchor="middle">+0.8</text></svg>
+   </div>
+  </div>
+
+  <div class="card stamp">
+    <div class="top"><div><div class="nm">pitcher_01050</div><div class="note">Temporada 2024 · Derecho · 796 pitcheos</div></div><span class="dpill loss">▼ −0.63</span></div>
+    <div class="chiprow"><span class="chip"><svg class="ic "><use href="#i-ball"/></svg>Four-Seam<small>49%</small></span><span class="chip"><svg class="ic "><use href="#i-ball"/></svg>Curveball<small>29%</small></span><span class="chip"><svg class="ic "><use href="#i-ball"/></svg>Slider<small>11%</small></span><span class="chip"><svg class="ic "><use href="#i-ball"/></svg>Sinker<small>9%</small></span><span class="chip"><svg class="ic "><use href="#i-ball"/></svg>Changeup<small>3%</small></span></div>
+    <h4><svg class="ic "><use href="#i-ball"/></svg>Mapa del arsenal · mar ○ → CDMX</h4>
+    <svg viewBox="0 0 340 270" class="minimap" role="img" aria-label="Mapa de movimiento del arsenal, nivel del mar a CDMX"><line x1="56.4" y1="8" x2="56.4" y2="246" class="gl"/><text x="56.4" y="258" class="ax" text-anchor="middle">-5</text><line x1="107.1" y1="8" x2="107.1" y2="246" class="gl"/><text x="107.1" y="258" class="ax" text-anchor="middle">0</text><line x1="157.7" y1="8" x2="157.7" y2="246" class="gl"/><text x="157.7" y="258" class="ax" text-anchor="middle">5</text><line x1="208.4" y1="8" x2="208.4" y2="246" class="gl"/><text x="208.4" y="258" class="ax" text-anchor="middle">10</text><line x1="259.1" y1="8" x2="259.1" y2="246" class="gl"/><text x="259.1" y="258" class="ax" text-anchor="middle">15</text><line x1="309.7" y1="8" x2="309.7" y2="246" class="gl"/><text x="309.7" y="258" class="ax" text-anchor="middle">20</text><line x1="26" y1="215.3" x2="330" y2="215.3" class="gl"/><text x="21" y="218.3" class="ax" text-anchor="end">-5</text><line x1="26" y1="176.9" x2="330" y2="176.9" class="gl"/><text x="21" y="179.9" class="ax" text-anchor="end">0</text><line x1="26" y1="138.5" x2="330" y2="138.5" class="gl"/><text x="21" y="141.5" class="ax" text-anchor="end">5</text><line x1="26" y1="100.1" x2="330" y2="100.1" class="gl"/><text x="21" y="103.1" class="ax" text-anchor="end">10</text><line x1="26" y1="61.7" x2="330" y2="61.7" class="gl"/><text x="21" y="64.7" class="ax" text-anchor="end">15</text><line x1="26" y1="23.4" x2="330" y2="23.4" class="gl"/><text x="21" y="26.4" class="ax" text-anchor="end">20</text><text x="170" y="269" class="ax2" text-anchor="middle">HB (in) →</text><text transform="translate(8 125) rotate(-90)" class="ax2" text-anchor="middle">IVB (in) →</text><defs><marker id="ah3" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L8 4L0 8z" fill="var(--loss)"/></marker></defs><line x1="273.9" y1="53.4" x2="247.3" y2="72.9" stroke="var(--loss)" stroke-width="1.8" marker-end="url(#ah3)"/><circle cx="273.9" cy="53.4" r="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="263.9" y="57.4" class="lb" text-anchor="end">Four-Seam</text><line x1="97.0" y1="212.3" x2="99.0" y2="205.9" stroke="var(--loss)" stroke-width="1.8" marker-end="url(#ah3)"/><circle cx="97.0" cy="212.3" r="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="107.0" y="206.3" class="lb" text-anchor="start">Curveball</text><line x1="80.9" y1="187.9" x2="86.4" y2="184.4" stroke="var(--loss)" stroke-width="1.8" marker-end="url(#ah3)"/><circle cx="80.9" cy="187.9" r="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="90.9" y="181.9" class="lb" text-anchor="start">Slider</text><line x1="272.3" y1="68.8" x2="247.2" y2="85.9" stroke="var(--loss)" stroke-width="1.8" marker-end="url(#ah3)"/><circle cx="272.3" cy="68.8" r="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="262.3" y="72.8" class="lb" text-anchor="end">Sinker</text><line x1="208.0" y1="115.6" x2="191.2" y2="124.9" stroke="var(--loss)" stroke-width="1.8" marker-end="url(#ah3)"/><circle cx="208.0" cy="115.6" r="6" fill="#fff" stroke="var(--navy)" stroke-width="2"/><text x="218.0" y="109.6" class="lb" text-anchor="start">Changeup</text></svg>
+    <h4><svg class="ic "><use href="#i-chart"/></svg>Stuff+ por pitcheo</h4>
+    <div><div class="mbrow"><span class="mbl">Four-Seam</span><span class="mbt"><b class="lvl" style="width:80.9%"></b><b class="lvl2" style="width:72.3%"></b></span><span class="mbv">102.1 → 100.9</span><span class="dpill loss">▼</span></div><div class="mbrow"><span class="mbl">Curveball</span><span class="mbt"><b class="lvl" style="width:54.6%"></b><b class="lvl2" style="width:55.7%"></b></span><span class="mbv">98.2 → 98.4</span><span class="dpill neu">●</span></div><div class="mbrow"><span class="mbl">Slider</span><span class="mbt"><b class="lvl" style="width:34.2%"></b><b class="lvl2" style="width:35.2%"></b></span><span class="mbv">95.1 → 95.3</span><span class="dpill neu">●</span></div><div class="mbrow"><span class="mbl">Sinker</span><span class="mbt"><b class="lvl" style="width:53.8%"></b><b class="lvl2" style="width:48.5%"></b></span><span class="mbv">98.1 → 97.3</span><span class="dpill loss">▼</span></div><div class="mbrow"><span class="mbl">Changeup</span><span class="mbt"><b class="lvl" style="width:22.0%"></b><b class="lvl2" style="width:21.6%"></b></span><span class="mbv">93.3 → 93.2</span><span class="dpill neu">●</span></div></div>
+    <div class="mmleg"><span><b style="color:var(--lvl-sea)">━</b> mar</span><span><b style="color:var(--lvl-cdmx)">━</b> CDMX</span><span class="bd">pitcher_arsenal_breakdown.csv</span></div>
+    <div class="spacer"></div>
+    <button class="btn primary block"><svg class="ic "><use href="#i-right"/></svg>Llevar al Simulador</button>
+  </div>
+ </div>
+</section>
+
+<!-- ============ SCULPTOR ============ -->
+<section class="screen" id="sculp">
+ <div class="sculp">
+  <div class="srow1">
+    <div class="card">
+      <h4><svg class="ic "><use href="#i-users"/></svg>Pares reales factibles</h4>
+      <div class="counter"><div class="n">39</div><div class="note" style="font-size:.8rem">en la LMB · pitcher_01050 · Four-Seam</div></div>
+      <div class="filt"><span>misma mano</span><span>±6.0° arm slot</span><span>±0.35 ft altura</span><span>±2.0 mph recta</span><span>≥ 50 pitcheos</span></div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="ph"><h4><svg class="ic "><use href="#i-target"/></svg>Stuff+ CDMX de pares con Four-Seam (25 filas) · franja p25–p75</h4><div class="bds"><span class="bd">PitchSculptor (HACK-016)</span><span class="bd">pitcher_arsenal_breakdown.csv</span></div></div>
+      <div class="rangebig">
+        <div class="axis"></div>
+        <div class="iqr" style="left:30.9%;width:23.4%"></div>
+        <div class="iqrl" style="left:calc(30.9% + 23.4%/2)">p25 99.16 – p75 100.81</div>
+        <div class="mk me" style="left:55.0%"><b>100.85</b>tu pitcheo</div>
+        <div class="mk ref" style="left:77.2%"><b>102.41</b>mejor par</div>
+      </div>
+      <div class="rticks"><span>97</span><span>98.5</span><span>100</span><span>101.5</span><span>103</span><span>104</span></div>
+    </div>
+  </div>
+  <div class="srow2">
+    <div class="card">
+      <h4><svg class="ic "><use href="#i-users"/></svg>Top 3 comparables LMB</h4>
+      <div class="comps" style="margin-top:.5rem"><div class="comp"><div class="ch"><strong>pitcher_00285</strong><span class="mut">2025</span></div><div class="cbig">102.4</div><div class="mut sm">Stuff+ CDMX · 139 pitcheos</div></div><div class="comp"><div class="ch"><strong>pitcher_01050</strong><span class="mut">2025</span></div><div class="cbig">101.6</div><div class="mut sm">Stuff+ CDMX · 278 pitcheos</div><span class="tag">mismo lanzador, otra temporada</span></div><div class="comp"><div class="ch"><strong>pitcher_00390</strong><span class="mut">2025</span></div><div class="cbig">101.1</div><div class="mut sm">Stuff+ CDMX · 299 pitcheos</div></div></div>
+      <div class="note" style="margin-top:.5rem">Mejor referencia: pitcher_00285 · 2025.</div>
+    </div>
+    <div class="card">
+      <h4><svg class="ic "><use href="#i-chart"/></svg>Repertorio secundario sostenido por pares</h4>
+      <div style="margin-top:.4rem"><div class="reprow"><span>Slider</span><span class="rt"><b style="width:61.3%"></b></span><span class="v">101.3</span><small>30 lanz.</small></div><div class="reprow"><span>Curveball</span><span class="rt"><b style="width:52.8%"></b></span><span class="v">100.7</span><small>10 lanz.</small></div><div class="reprow"><span>Cutter</span><span class="rt"><b style="width:52.7%"></b></span><span class="v">100.7</span><small>2 lanz.</small></div><div class="reprow"><span>Sinker</span><span class="rt"><b style="width:50.9%"></b></span><span class="v">100.6</span><small>20 lanz.</small></div><div class="reprow"><span>Splitter</span><span class="rt"><b style="width:49.7%"></b></span><span class="v">100.5</span><small>3 lanz.</small></div></div>
+      <div class="note">Mediana de Stuff+ CDMX entre pares factibles.</div>
+      <div class="dg" style="margin-top:.8rem"><span class="mut sm">delta_gain_cdmx</span><span class="n gain">▲ +1.56</span></div>
+      <div class="note ill">diferencia observada frente a pares reales; no es una ganancia causal garantizada</div>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;gap:.7rem">
+      <div class="coach"><div class="lab">[Guía cualitativa de coaching — literatura biomecánica, no estimada del dataset]</div><div style="font-size:1.15rem;line-height:1.5">Priorizar la intención de backspin limpio y una trayectoria de brazo consistente; el agarre no se infiere del dataset.</div></div>
+      <h4><svg class="ic "><use href="#i-ball"/></svg>Tu pitcheo</h4><div class="mini2" style="grid-template-columns:repeat(3,1fr)"><div class="mini"><span class="t"><svg class="ic "><use href="#i-arm"/></svg>Arm slot</span><span class="v" style="font-size:2rem">29.7<small>°</small></span></div><div class="mini"><span class="t"><svg class="ic "><use href="#i-up"/></svg>Altura</span><span class="v" style="font-size:2rem">6.02<small>ft</small></span></div><div class="mini"><span class="t"><svg class="ic "><use href="#i-gauge"/></svg>Recta</span><span class="v" style="font-size:2rem">91.9<small>mph</small></span></div></div>
+      <div class="spacer"></div>
+      <button class="btn primary block"><svg class="ic "><use href="#i-right"/></svg>Llevar referencia al Simulador</button>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ============ ESCENARIOS ============ -->
+<section class="screen" id="esc">
+  <div class="ttl">Escenarios de uso</div>
+  <div class="scen">
+    <div class="card sc"><div class="bubble"><svg class="ic "><use href="#i-mtn"/></svg></div><h3>Fichaje: ¿cómo rendirá en el Harp Helú?</h3><p>Elige un lanzador del catálogo y compara su Stuff+ a nivel del mar contra el de CDMX.</p><button class="btn primary"><svg class="ic "><use href="#i-right"/></svg>Abrir en el Simulador</button></div>
+    <div class="card sc"><div class="bubble"><svg class="ic "><use href="#i-target"/></svg></div><h3>Rediseño de pitcheo (Sculptor)</h3><p>Dado un pitcheo, ¿qué referencias reales y factibles de la LMB sostienen mejor su Stuff+ en CDMX?</p><button class="btn primary"><svg class="ic "><use href="#i-right"/></svg>Abrir Sculptor</button></div>
+    <div class="card sc"><div class="bubble"><svg class="ic "><use href="#i-swap"/></svg></div><h3>Casa vs gira</h3><p>¿Cuánto cambia el valor de un lanzador entre el Harp Helú y un parque a nivel del mar?</p><button class="btn primary"><svg class="ic "><use href="#i-right"/></svg>Abrir comparativa</button></div>
+  </div>
+  <div class="note" style="margin-top:.9rem">Las tarjetas no muestran cifras: se llenan al ejecutar cada caso.</div>
+</section>
+
+<!-- ============ METODOLOGIA ============ -->
+<section class="screen" id="met">
+  <div class="ttl">Cómo se calcula cada número</div>
+  <div class="pipe">
+    <div class="card step"><span class="n">1</span><div class="bubble"><svg class="ic "><use href="#i-mtn"/></svg></div><h3>ρ̂ por juego</h3><p>Densidad del aire de cada juego. CDMX usa la mediana de Altitud Extrema: <b style="color:var(--text)">0.8518</b>.</p></div>
+    <div class="card step"><span class="n">2</span><div class="bubble"><svg class="ic "><use href="#i-fall"/></svg></div><h3>Traductor físico</h3><p>Traduce IVB y HB entre densidades del aire; la gravedad no cambia.</p></div>
+    <div class="card step"><span class="n">3</span><div class="bubble"><svg class="ic "><use href="#i-gauge"/></svg></div><h3>Stuff+ · Location+ · Pitching+</h3><p>Puntajes con 100 = promedio LMB. Stuff+ solo mira la física del lanzamiento.</p></div>
+    <div class="card step"><span class="n">4</span><div class="bubble"><svg class="ic "><use href="#i-shield"/></svg></div><h3>Validación en 3 holdouts</h3><p>Pitcher, Season y Park contra CountBaselineModel: <b class="gain">4.50%</b> · <b class="gain">4.77%</b> · <b class="gain">4.14%</b> menos RMSE.</p></div>
+    <div class="card step"><span class="n">5</span><div class="bubble"><svg class="ic "><use href="#i-layers"/></svg></div><h3>Descomposición de 3 términos</h3><p>Total = Stuff + Parque (bolas en juego) + residuo no atribuido, sobre 778 pitchers pareados.</p></div>
+  </div>
+  <div class="honest">
+    <div><svg class="ic "><use href="#i-shield"/></svg>Siempre pitch_id, nunca AutoPitchType, para comparar entre altitudes.</div>
+    <div><svg class="ic "><use href="#i-layers"/></svg>El residuo se muestra aparte y nunca se atribuye a ningún canal.</div>
+    <div><svg class="ic "><use href="#i-target"/></svg>Sculptor busca referencias reales de la LMB; no inventa pitcheos ni promete ganancias causales.</div>
+  </div>
+</section>
+
+<section class="screen" id="velo"><div class="wait"><svg class="ic "><use href="#i-clock"/></svg><h3>VeloVision</h3><span class="bd">EN ESPERA</span><p>Pendiente de HACK-017.</p></div></section>
+</main>
+
+<script>
+const btns=document.querySelectorAll('nav button');
+btns.forEach(b=>b.addEventListener('click',()=>{
+  const t=b.dataset.t;
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===t));
+  btns.forEach(x=>x.classList.toggle('on',x===b));
+}));
+const ex=document.getElementById('exp'),an=document.getElementById('analyst');
+function setA(o){an.classList.toggle('open',o);ex.classList.toggle('open',o);ex.querySelector('.pill').textContent=o?'abierto':'cerrado';}
+document.getElementById('exptoggle').addEventListener('click',()=>setA(!an.classList.contains('open')));
+const h=location.hash.slice(1);
+if(h==='sim-analyst'){setA(true);}
+else if(h){const b=document.querySelector('nav button[data-t="'+h+'"]');if(b)b.click();}
+</script>
+</body>
+</html>
