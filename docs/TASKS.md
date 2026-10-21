@@ -20,11 +20,11 @@
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
-| **HACK-010** | S2 | P0 | `IN_PROGRESS` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
+| **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
-| **HACK-012** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
-| **HACK-013** | S2 | P0 | `AVAILABLE` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
-| **HACK-014** | S2 | P0 | `AVAILABLE` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
+| **HACK-012** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
+| **HACK-013** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
+| **HACK-014** | S2 | P0 | `APPROVED` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
 | **HACK-017** | S3 | P1 | `AVAILABLE` | `HACK-014` | Módulo **VeloVision** (MediaPipe Pose $\to$ rango Stuff+ CDMX) + validación manual (`src/vision/pose_slot.py`) |
@@ -334,7 +334,7 @@
 ---
 
 ### `HACK-010` — Submodelo `Stuff+` en Sabores Neutral y CDMX (`src/models/stuff.py`)
-- **State:** `IN_PROGRESS` (re-corrida requerida por la segunda reapertura de HACK-010)
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-009`
 - **AllowedPaths:**
   - `src/models/stuff.py`
@@ -415,12 +415,21 @@
 - **Criterios adicionales:**
   - **(5)** Ninguna columna de `TRAJECTORY_PROXY_COLS` está en `feature_cols`. Lo verifica un test.
   - **(6)** Un script de diagnóstico, `analysis/stuff_diagnostics.py` (nuevo en AllowedPaths), reporta sobre datos reales en `reports/validation/stuff_diagnostics.csv`:
-    - el R² fuera de muestra de reconstruir `PlateLocHeight` y `PlateLocSide` desde las features finales de Stuff+, que debe ser **≤ 0.30**;
+    - el R² fuera de muestra de reconstruir `PlateLocHeight` y `PlateLocSide` desde las features finales de Stuff+. **(Redefinido por el Orquestador con el usuario, 2026-10-20.)** El umbral fijo de 0.30 no tenía referencia. En la primera corrida dio 0.312 en altura, y la ablación lo atribuye a la velocidad y al tipo de pitcheo, no a la trayectoria. El criterio ahora es **R²_completo − R²_referencia ≤ 0.20** en cada eje, donde R²_referencia es el R² medido con solo las features de velocidad de Stuff+ (`RelSpeed`, `EffectiveVelo`, `ZoneSpeed`, `velo_diff_vs_fb`) más `pitch_id`. Ambas cifras se reportan tal cual en el CSV;
     - la sensibilidad mediana de Stuff+ por pulgada de IVB y HB y por mph, por `pitch_id`, con los derivados recalculados;
     - el ΔStuff+ CDMX medio por `pitch_id` con IC bootstrap por pitcher.
     Estas cifras se reportan tal cual; no hay umbral de sensibilidad que forzar.
 - **Efecto aguas abajo:** HACK-012, HACK-013 y HACK-014 vuelven a `AVAILABLE` y deben re-correrse con el modelo nuevo. El criterio de HACK-012 se revisará con los resultados reales.
 - **AllowedPaths de esta reapertura:** `src/models/stuff.py`, `tests/test_stuff.py`, `analysis/stuff_diagnostics.py`, `reports/validation/stuff_diagnostics.csv`.
+
+**Sexta revisión (APROBADA, 66 pruebas pasan, exit code 0 con `.venv\Scripts\python.exe -m pytest -q tests/test_stuff.py`):**
+- AllowedPaths: el diff de código solo toca `src/models/stuff.py`, `tests/test_stuff.py`, `analysis/stuff_diagnostics.py` y `reports/validation/stuff_diagnostics.csv`. (`.claude/` sin seguimiento es del entorno, no del modelo.)
+- Criterio 5: `STUFF_FEATURES` ya no contiene `VertRelAngle`, `HorzRelAngle_norm`, `tunnel_dist_170ms_in` ni `tunnel_sim_170ms` (`src/models/stuff.py:114-126`). `TRAJECTORY_PROXY_COLS` (`:134-140`) la valida `assert_valid_stuff_features` (`:185-191`, ValueError) antes de la lista blanca. Un grep de las columnas prohibidas en `stuff.py` solo da docstrings y la lista de proxies: se eliminaron la normalización en `_prepare_stuff_features`, `num_cols` de `_fit_primary_fb_reference` y `fb_row` de `_recompute_arsenal_diffs_at_density`. Las medianas salen de `feature_cols`. Los tests (`tests/test_stuff.py:677-700`) cubren `feature_cols`, SHAP y el rechazo de cada proxy.
+- Criterio 6 (redefinido, no reabierto): se re-corrió `python -m analysis.stuff_diagnostics` con una salida temporal y el CSV resultó **idéntico byte a byte** al versionado. Exceso sobre la referencia: altura 0.1275 (0.3123 − 0.1848), lado 0.1117 (0.1378 − 0.0261); `PlateLocSide_norm` 0.0917. Máximo 0.1275 ≤ 0.20. En el código (`analysis/stuff_diagnostics.py:90-120`), el modelo completo y la referencia usan la misma muestra `d`, los mismos `folds` (un `GroupKFold` por `pitcher_anon_id`, calculado una sola vez) y el mismo `_lgbm_loc()`. No hay fuga entre folds.
+- Regularización: `_select_lgbm_params` (`src/models/stuff.py:651-713`) recibe `X_train`, que viene de `df_train` filtrado a `year <= 2025` (`:477`) y a `No Altitude` (`:510-513`). Usa `GroupKFold` por pitcher y no recibe holdouts de HACK-012. La rejilla de 12 combinaciones y la elección (`nl=7, mc=1000, rl=300`, RMSE 0.21393) están documentadas en el docstring (sección 5) y en el CSV. La diferencia entre combinaciones es ~1e-4: la elección es estable.
+- Se conserva lo aprobado: residuo sobre el conteo y `predict_outcomes`, OOF, entrenamiento en No Altitude, referencia de recta guardada en `fit`, SHAP aditivo y escala 100/10 con μ/σ neutrales sobre el LMB completo (las pruebas heredadas pasan). Checklist original: CDMX con μ/σ neutrales y sin `PlateLoc`/conteo/`BatterSide`.
+- Plausibilidad: Four-Seam −4.57 en CDMX (IC −4.84/−4.28) y sensibilidad IVB +2.29 pts/in son coherentes. La menor densidad reduce Magnus y arrastre, el IVB baja unas pulgadas y el modelo lo premia con signo positivo. Los signos mixtos en los demás pitcheos tienen IC que cruzan 0 o son pequeños (|s| < 0.7). Son una no linealidad aceptable (quiebre negativo del Curveball/Slider, interacción velocidad-movimiento), no un defecto. Aviso no bloqueante: el sinker tiene sensibilidad en HB positiva y el Changeup tiene IVB negativa; HACK-013 debe presentarlo como resultado, no forzarlo.
+- Observación no bloqueante: la sensibilidad de `ci_low`/`ci_high` son cuartiles Q25/Q75 y no un IC (está documentado en el docstring, `analysis/stuff_diagnostics.py:34-36`).
 
 ### `HACK-011` — Submodelos `Location+` y `Pitching+` Multi-Target (`src/models/location_pitching.py`)
 - **State:** `APPROVED`
@@ -455,7 +464,7 @@
 ---
 
 ### `HACK-012` — Suite de Validación en los 3 Holdouts vs Baseline Nulo (`analysis/run_validation.py`)
-- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
+- **State:** `APPROVED` (re-evaluado 2026-10-21 con el Criterio 1 actualizado)
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/__init__.py`
@@ -482,7 +491,12 @@
      - `reports/validation/calibration_deciles.csv`
      - `reports/validation/year_to_year_stability.csv`
 - **Criterios de Aceptación:**
-  1. `Pitching+` y `Stuff+` superan (menor RMSE y menor Log-Loss) al `CountBaselineModel` en los 3 holdouts.
+  1. **(Actualizado por el usuario y el Orquestador, 2026-10-21, tras quitar a Stuff+ los proxies de ubicación en la segunda reapertura de HACK-010.)** En los 7 cortes de los 3 holdouts:
+     - **`Pitching+`** supera (menor RMSE y menor Log-Loss) al `CountBaselineModel` en **todos** los targets.
+     - **`Stuff+`** se juzga solo en `xrv_pitcher` y en los targets de *stuff*: `target_whiff`, `target_chase`, `target_hard_contact`, `target_weak_contact`.
+       - En los 4 targets binarios: menor RMSE y menor Log-Loss que el baseline.
+       - En `xrv_pitcher`: RMSE ≤ RMSE del baseline + **0.0001** (≈ 0.05 % del RMSE). Si Stuff+ no es menor, el corte se reporta como **empate**, nunca como victoria.
+     - `target_called_strike`, `target_out_on_pitch` y `target_groundball` de Stuff+ se **reportan sin exigir**. Dependen sobre todo de ubicación y conteo, que Stuff+ tiene prohibido usar (AGENTS.md §3.3). Que Stuff+ no les gane al conteo es lo esperado y se documenta tal cual.
   2. Los 3 archivos CSV existen en `reports/validation/` con cifras reales calculadas.
 - **Verify Command:**
   ```powershell
@@ -509,10 +523,50 @@
 - Sin fuga por `fit_lmb_run_values`: se ajusta con `train` (`run_validation.py:96`) y su tabla solo se aplica a test via `attach_targets`; no usa filas de test.
 - Observacion heredada (offset de Stuff+ ajustado solo con `No Altitude`, `stuff.py:465,495`, vs baseline de comparacion con todo el train): no invalida la comparacion; es un desajuste que perjudica a Stuff+ (menos datos/distinto parque) y aun asi gana con margen. Solo requiere documentarse en el informe final; en Park es equivalente al no haber Extreme en train.
 
+#### Notas de Revisión (re-corrida tras la segunda reapertura de HACK-010)
+- Verify: `.venv\Scripts\python.exe -m pytest -q tests/test_validation_suite.py` -> 5 passed, exit 0. `run_status.json`: complete=true, 7 cortes + estabilidad.
+- Alcance OK: `analysis/run_validation.py`, `tests/test_validation_suite.py` y `analysis/__init__.py` sin cambios; solo cambian CSV/JSON de `reports/validation/` (AllowedPaths). El resto del working tree es de HACK-010/013 (`reports/validation/stuff_diagnostics.csv` es de HACK-010).
+- Criterio 2 OK: 224 filas de métricas, 280 de calibración, 3 de estabilidad con cifras reales; estabilidad etiquetada `in_sample_train_2024_2025` (Stuff+ r = 0.7415, Spearman 0.7554, n = 202).
+- Checklist OK: `run_validation.py:37-41` y `:90-101` ajustan traductor, modelos y baseline solo con `train = df.loc[train_idx]`.
+- **Criterio 1 FALLA (evaluado tal como está escrito, sin reinterpretar).** Pitching+: 0 fallas en 105 comparaciones (7 cortes x 8 targets + xrv_pitcher, RMSE y Log-Loss). Stuff+: 8 fallas (margen = Stuff+ - baseline; positivo = peor):
+
+| Corte | Target | Métrica | Stuff+ | Baseline | Margen |
+|---|---|---|---|---|---|
+| pitcher_fold_1 | target_called_strike | Log-Loss | 0.377204 | 0.376496 | +0.000708 |
+| pitcher_fold_1 | xrv_pitcher | RMSE | 0.209156 | 0.209139 | +0.000017 |
+| pitcher_fold_2 | target_called_strike | Log-Loss | 0.376461 | 0.374278 | +0.002182 |
+| pitcher_fold_4 | target_called_strike | Log-Loss | 0.376730 | 0.376517 | +0.000213 |
+| pitcher_fold_5 | target_called_strike | Log-Loss | 0.377230 | 0.377011 | +0.000219 |
+| season | target_called_strike | Log-Loss | 0.404960 | 0.402812 | +0.002148 |
+| park | target_called_strike | Log-Loss | 0.369356 | 0.369261 | +0.000094 |
+| park | xrv_pitcher | RMSE | 0.211470 | 0.211461 | +0.000009 |
+
+  Se confirma lo informado por el Orquestador: Log-Loss de `target_called_strike` falla en 6 de 7 cortes (pasa pitcher_fold_3), el RMSE de `target_called_strike` pasa en los 7, y el RMSE de `xrv_pitcher` falla en pitcher_fold_1 y park. El resto de targets y cortes pasa. Location+ (fuera del criterio) sigue perdiendo en groundball y out_on_pitch.
+- Para cerrar: la corrección requiere una decisión del usuario sobre el criterio de aceptación o sobre el modelo (HACK-010). No se modificaron métricas, código ni reportes.
+
+#### Veredicto del Revisor (2026-10-21, criterio 1 actualizado): APPROVED
+- Verify: `pytest -q tests/test_validation_suite.py` -> 5 passed, exit 0 (corrida anterior; ni `holdout_metrics.csv` ni el código cambiaron desde entonces). Sin cambios a código ni a métricas en esta evaluación.
+- Pitching+ (7 cortes, todos los targets, RMSE y Log-Loss): 0 fallas. Margen mínimo (baseline - modelo): RMSE 0.005429, Log-Loss 0.025133. Log-Loss de `xrv_pitcher` es NaN por ser continuo y no aplica.
+- Stuff+ binarios de stuff (7 cortes, RMSE y Log-Loss): 0 fallas. Márgenes mínimos: whiff RMSE 0.002233 / LL 0.005269; chase RMSE 0.000241 / LL 0.000430; hard_contact RMSE 0.000193 / LL 0.000744; weak_contact RMSE 0.000178 / LL 0.000488.
+- Stuff+ `xrv_pitcher` (RMSE <= baseline + 0.0001): 7/7 dentro de tolerancia. Empates (no victorias):
+
+| Corte | Stuff+ RMSE | Baseline RMSE | Delta | Resultado |
+|---|---|---|---|---|
+| pitcher_fold_1 | 0.209156 | 0.209139 | +0.000017 | EMPATE |
+| pitcher_fold_2 | 0.207804 | 0.207827 | -0.000023 | gana |
+| pitcher_fold_3 | 0.207315 | 0.207348 | -0.000033 | gana |
+| pitcher_fold_4 | 0.208430 | 0.208516 | -0.000086 | gana |
+| pitcher_fold_5 | 0.207861 | 0.207897 | -0.000036 | gana |
+| season | 0.217513 | 0.217557 | -0.000044 | gana |
+| park | 0.211470 | 0.211461 | +0.000009 | EMPATE |
+
+- Reportados sin exigir (Stuff+): `called_strike` pierde en Log-Loss en 6 de 7 cortes (hasta +0.002182 en pitcher_fold_2); `out_on_pitch` y `groundball` no se exigen. Se documentan tal cual.
+- Criterio 2 y checklist: cumplen (ver notas previas); traductor, modelos y baseline se ajustan solo con `train_idx` (`run_validation.py:37-41, 90-101`). Las cifras de xRV en empate deben presentarse como empate en el informe final.
+
 ---
 
 ### `HACK-013` — Descomposición Canal Stuff vs. Canal Parque y Pruebas H1–H4 (`analysis/run_hypotheses.py`)
-- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-010, HACK-011`
 - **AllowedPaths:**
   - `analysis/run_hypotheses.py`
@@ -559,11 +613,12 @@
 - `reports/altitude/channel_decomposition.csv`, `reports/altitude/delta_by_pitch_shape.csv`, `reports/altitude/hypotheses_h1_h4_summary.csv` (AllowedPaths): son salidas requeridas y aparecen sin seguimiento, pero `reports/` no está en `AllowedPaths`. El orquestador debe reconciliar la lista para autorizar solo estos reportes agregados requeridos antes de reentregar.
 
 - **Revisión independiente 2026-10-20 (APPROVED):** Verify `python -m pytest -q tests/test_hypotheses_channels.py` -> 7 passed, exit 0. Diff limitado a `analysis/run_hypotheses.py` y `tests/test_hypotheses_channels.py`; CSV de `reports/altitude/` solo los 3 de AllowedPaths. CSV reales: total = -0.0141316, stuff = -0.0003433, parque BIP = -0.0060007, residuo no atribuido = -0.0077876; suma - total = 9.9e-17 (atol 1e-10 OK); share_of_total suma 1.0 (0.024/0.425/0.551); `decomposition_type = three_term`, sin `NOT_ESTIMABLE`; residuo con CI/p/n_pitchers=778 propios y etiqueta `residuo_no_atribuido (no se atribuye a ningún canal)`. `pitch_id` invariante (run_hypotheses.py:169-170) y bootstrap/agrupación por `pitcher_anon_id` (:72, :195). Conversión Score+ -> xRV (:204-205) correcta: `stuff.py:684-692` define Score+ = 100 + 10*(pred-mu)/sigma y `pred` es la salida del meta-ridge entrenado sobre el residuo de `xrv_pitcher` (+ = bueno para el pitcher, CONTRACT), así que Δpred = (Δ Score+/10)*sigma_neutral_ está en unidades xRV con signo coherente. La caída de Stuff de -0.00117 a -0.00034 es plausible: al ser residuo sobre el conteo, el modelo ya no absorbe varianza de conteo y el meta-ridge contrae más; el orden de magnitud sigue siendo pequeño y el CI excluye 0 (no verificado con reentrenamiento independiente). Honestidad: parque descrito como contraste descriptivo en BIP, "no causal" (:231, :345); el 55 % residual queda sin atribuir; sin cifras inventadas. Observación no bloqueante: Stuff explica solo ~2 % del total y el residuo es el término mayor; conviene decirlo así en el informe final.
+- **Revisión independiente de la re-corrida (2026-10-20, tras segunda reapertura de HACK-010): APPROVED.** Verify `python -m pytest -q tests/test_hypotheses_channels.py` -> 7 passed, exit 0. La re-corrida solo cambió los 3 CSV de `reports/altitude/`; `analysis/run_hypotheses.py` y su test sin cambios (el resto del working tree es HACK-010). Cifras nuevas: total = -0.014132; Stuff = -0.001278 (9.0 %, IC -0.001339/-0.001214); parque BIP = -0.006001 (42.5 %); residuo no atribuido = -0.006853 (48.5 %); suma - total = 1.0e-16 (atol 1e-10 OK), shares suman 1.0, `decomposition_type = three_term`, residuo con etiqueta propia, CI y n_pitchers=778. Checklist: `pitch_id` (run_hypotheses.py:169-170) y bootstrap por `pitcher_anon_id`. Conversión Score+ -> xRV (:204-205) correcta con sigma_neutral_ = 0.0430. H1-H4 bien planteadas; Sinker (HB) y Changeup se reportan tal cual, sin forzar. Parque descrito como no causal. Observaciones no bloqueantes: (a) Stuff pasó de 2.4 % a 9.0 % pero sigue siendo pequeño; el residuo (48.5 %) es el mayor término junto con el parque, y el informe debe decirlo. (b) Discrepancia a explicar, no bloqueante: reproduje el contrafactual de `run_hypotheses.py` con `models/stuff_model.joblib` y rho = mediana Extreme. El delta medio por fila es -0.206 Score+ en No Altitude (296,675 filas) y +0.078 en Extreme (182,474 filas), muy por debajo del ΔStuff+ CDMX medio de -1.52 de `stuff_diagnostics.csv`. El canal Stuff (-0.00128 xRV) es coherente con ese contrafactual de la re-corrida pero no con el -1.52 (que implicaría -0.0066 xRV); probablemente se deba a muestra/rho/modelo distintos en el diagnóstico, sin confirmar. El canal Stuff debe leerse como cota baja y el informe no debe citar -1.52 y 9.0 % como si fueran la misma medida. (c) En `delta_by_pitch_shape.csv` `delta_stuff_cdmx` es la diferencia Extreme-vs-Neutral del delta contrafactual por fila (Four-Seam +2.19), no el ΔStuff+ de HACK-010 (-4.57); no deben compararse directamente.
 
 ---
 
 ### `HACK-014` — Exportador Oficial del Entregable 1 y Artefactos para Dashboard (`analysis/export_scores.py`)
-- **State:** `AVAILABLE` (re-corrida requerida por la segunda reapertura de HACK-010)
+- **State:** `APPROVED`
 - **Sprint:** 2 · **Priority:** `P0` · **DependsOn:** `HACK-012, HACK-013`
 - **AllowedPaths:**
   - `analysis/export_scores.py`
@@ -596,6 +651,7 @@
   2. `analysis/export_scores.py:145-167` (`_arsenal`) y `:61-65` (`AUX_COLS`): faltan `PitcherThrows`, `arm_slot_deg`, `RelHeight`, `fb_velo` (velo media de la recta primaria del pitcher-año), `rho_cdmx_used` (`n_pitches` ya está). HACK-016/017 los necesitan. Corrección: agregar `RelHeight` a AUX_COLS, `arm_slot_deg` y `PitcherThrows` al spec, `fb_velo` y `rho_cdmx_used=rho`; y tests que verifiquen columnas.
   3. Documentar en el docstring (`:3-35`) que los modelos se ajustan con year<=2025 y que 2026 es out-of-sample (`:71`).
 - **Segunda revisión (Revisor, 2026-10-20): `APPROVED`.** Verify real: `pytest -q tests/test_export_scores.py` -> 8 passed, exit 0. Las 3 fallas previas corregidas: (1) `export_scores.py:127-165` `_channel_decomposition` + `_leaderboard` añaden `canal_total/canal_stuff/canal_parque_bip/residuo_no_atribuido` (reutiliza `_paired_batted_ball_park` de `run_hypotheses`); en CSV real 921/1721 pitcher-año estimables, 800 con las 4 columnas NaN explícito (nunca filas parciales, sin `fillna`), sin redondeo, max|stuff+parque+residuo-total| = 2.1e-16. (2) `_arsenal` (`:228-237`): `PitcherThrows`, `arm_slot_deg`, `RelHeight`, `fb_velo` (147 NaN = sin recta, no rellenados), `rho_cdmx_used` = 0.8518 presentes en el CSV. (3) docstring `:3-48` documenta entrenamiento year<=2025 y 2026 out-of-sample. Criterio 1: 3 CSV (1.14 MB, 361 KB, 72 KB), ningún CSV de `reports/**` con `PitchUID` ni > 2 MB. Criterio 2 ya verificado en la 1ª revisión (634,624 filas únicas). Coherencia con `reports/altitude/channel_decomposition.csv` (comparabilidad limitada: el agregado es pareado sobre todos los años y 778 pitchers; aquí es por pitcher-año, 921 filas, media simple): total -0.0127 vs -0.0141; stuff -0.00037 vs -0.00034; parque BIP -0.0055 vs -0.0060; residuo -0.0069 vs -0.0078. Mismo signo y orden de magnitud, mismas proporciones (stuff ~3 %, parque ~43 %, residuo ~54 %); no se espera igualdad exacta. Honestidad: residuo etiquetado `residuo_no_atribuido`, nunca como parque. Alcance: los archivos modificados fuera de AllowedPaths (`run_hypotheses.py`, `stuff.py`, tests de 010/013, `dashboard/`, `src/sculptor/`) pertenecen a otras tareas; HACK-014 solo aporta `export_scores.py`, `test_export_scores.py` y `reports/leaderboards/`. Observación no bloqueante: la columna del leaderboard se llama `pitcher_throws` y en el arsenal `PitcherThrows` (consumidores deben usar el nombre correcto).
+- **Tercera revisión, re-corrida (Revisor, 2026-10-21): `APPROVED`.** Verify real: `pytest -q tests/test_export_scores.py` -> 8 passed, exit 0. `git status`: la re-corrida solo cambió `reports/leaderboards/*.csv` (`data/` y `models/*.joblib` ignorados). Cifras nuevas: CSV 1.14 MB / 0.36 MB / 0.07 MB, ningún CSV de `reports/**` con `PitchUID` ni >= 2 MB. Parquet: 634,624 filas = 100 % de `PitchUID` válidos, únicos, 0 NaN; `rho_cdmx_used` = 0.8518. Leaderboard: 4 columnas de descomposición, 921 de 1,721 pitcher-año estimables, 800 con NaN explícito (nunca parciales), max|stuff+parque+residuo-total| = 2.1e-16. Arsenal con las 5 columnas extra (5,447 filas). Coherencia con modelo nuevo: `models/stuff_model.joblib` tiene 22 `feature_cols` sin ninguna de `TRAJECTORY_PROXY_COLS` (intersección vacía); `stuff_plus_neutral` media 99.995, desviación 10.05; ΔStuff+ CDMX medio -2.34 (antes -0.06); por pitch_id: Four-Seam -4.52, Sinker -2.12, Changeup -1.60, Splitter -1.26, Curveball -0.46, Cutter -0.39, Slider -0.30, mismos signos y orden que `reports/validation/stuff_diagnostics.csv` (Four-Seam -4.57, Sinker -2.07, Changeup -1.62, Splitter -1.26, Curveball -0.46, Cutter -0.39, Slider -0.29; submuestra de 5,000). `tunnel_sim_170ms` en el arsenal es solo `mean` descriptivo (`export_scores.py:214`) y no está en las features de Stuff+. Código sin cambios.
 - **Reviewer Checklist:**
   - [x] ¿Ningún archivo dentro de `reports/` contiene la columna `PitchUID` ni supera los 2 MB?
 

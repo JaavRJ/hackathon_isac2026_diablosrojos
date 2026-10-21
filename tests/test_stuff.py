@@ -50,8 +50,10 @@ from src.config import (
     TARGET_COLS,
 )
 from src.models.movement import PhysicsMovementTranslator
+import src.models.stuff as stuff_module
 from src.models.stuff import (
     STUFF_FEATURES,
+    TRAJECTORY_PROXY_COLS,
     StuffPlusModel,
     assert_valid_stuff_features,
 )
@@ -668,3 +670,84 @@ def test_predict_outcomes_valid_probabilities_no_nan(
     assert (out[binary] >= 1e-6).all().all()
     assert (out[binary] <= 1.0 - 1e-6).all().all()
     assert (out[binary] >= 0.0).all().all() and (out[binary] <= 1.0).all().all()
+
+
+# ==============================================================================
+# 9. Sin proxies de ubicacion (segunda reapertura de HACK-010, criterio 5)
+# ==============================================================================
+
+def test_trajectory_proxy_cols_not_in_feature_cols(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """Ninguna columna de TRAJECTORY_PROXY_COLS esta en STUFF_FEATURES ni en model.feature_cols."""
+    train_df, _ = processed_lmb_dataset
+    model = StuffPlusModel().fit(train_df)
+    assert set(TRAJECTORY_PROXY_COLS) == {
+        "VertRelAngle", "HorzRelAngle", "HorzRelAngle_norm", "VertApprAngle",
+        "HorzApprAngle", "tunnel_dist_170ms_in", "tunnel_sim_170ms",
+    }
+    for col in TRAJECTORY_PROXY_COLS:
+        assert col not in STUFF_FEATURES
+        assert col not in model.feature_cols
+    # Tampoco aparecen en el SHAP
+    exp = model.explain_pitch(train_df.iloc[[0]])
+    assert not set(TRAJECTORY_PROXY_COLS) & set(exp["shap_values"])
+
+
+@pytest.mark.parametrize("proxy_col", TRAJECTORY_PROXY_COLS)
+def test_assert_valid_stuff_features_rejects_trajectory_proxies(proxy_col: str):
+    """assert_valid_stuff_features y el constructor fallan con cada proxy de trayectoria."""
+    bad_features = STUFF_FEATURES + [proxy_col]
+    with pytest.raises(ValueError, match="proxies de trayectoria"):
+        assert_valid_stuff_features(bad_features)
+    with pytest.raises(ValueError):
+        StuffPlusModel(feature_cols=bad_features)
+
+
+def test_lgbm_grid_search_runs_cv_by_pitcher_on_no_altitude(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame], monkeypatch: pytest.MonkeyPatch,
+):
+    """Con el umbral CV_MIN_ROWS bajado, se evalua la rejilla (CV por pitcher) y se elige el minimo RMSE."""
+    train_df, _ = processed_lmb_dataset
+    monkeypatch.setattr(stuff_module, "CV_MIN_ROWS", 50)
+    model = StuffPlusModel().fit(train_df)
+    res = model.lgbm_cv_results_
+    assert 1 <= len(res) <= 12
+    best_rmse = min(r["cv_rmse"] for r in res)
+    chosen = [r for r in res if all(r[k] == v for k, v in model.best_lgbm_params_.items())]
+    assert chosen and chosen[0]["cv_rmse"] == pytest.approx(best_rmse)
+    assert set(model.best_lgbm_params_) == {
+        "num_leaves", "min_child_samples", "reg_lambda", "learning_rate", "n_estimators",
+    }
+    n_no_alt = int((train_df["altitude_category"] == "No Altitude").sum())
+    assert all(r["n_cv_rows"] <= n_no_alt for r in res)
+
+
+def test_lgbm_small_data_uses_default_params(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """Con el fixture sintetico (< CV_MIN_ROWS) no se busca: se usan los parametros por defecto."""
+    train_df, _ = processed_lmb_dataset
+    model = StuffPlusModel().fit(train_df)
+    assert model.lgbm_cv_results_ == []
+    assert model.best_lgbm_params_ == stuff_module.LGBM_DEFAULT_PARAMS
+
+
+def test_stuff_diagnostics_script_reports_reference_r2(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """El script de diagnostico produce r2_reference y r2_excess_over_reference (criterio 6)."""
+    from analysis.stuff_diagnostics import COLUMNS, run_diagnostics
+
+    train_df, _ = processed_lmb_dataset
+    out = run_diagnostics(train_df, max_per_pitch=40, r2_max_rows=3000, n_boot=20, verbose=False)
+    assert list(out.columns) == COLUMNS
+    for tgt in ("PlateLocHeight", "PlateLocSide"):
+        full = out[out["metric"] == f"loc_r2_oos_{tgt}"]["value"]
+        ref = out[out["metric"] == f"loc_r2_reference_{tgt}"]["value"]
+        exc = out[out["metric"] == f"loc_r2_excess_over_reference_{tgt}"]["value"]
+        assert len(full) == len(ref) == len(exc) == 1
+        assert exc.iloc[0] == pytest.approx(full.iloc[0] - ref.iloc[0])
+    assert (out["metric"] == "loc_r2_excess_max").sum() == 1
+    for m in ("delta_stuff_cdmx_mean", "sens_ivb_pts_per_in", "lgbm_chosen"):
+        assert (out["metric"] == m).any()

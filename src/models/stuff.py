@@ -13,12 +13,17 @@ Arquitectura y Principios Físicos:
 1. Features Autorizadas (STUFF_FEATURES):
    - Variables físicas de release y trayectoria: velocidad (RelSpeed, EffectiveVelo,
      ZoneSpeed), giro (SpinRate, SpinAxis_sin, SpinAxis_cos), punto de liberación
-     (RelHeight, RelSide_norm, Extension, VertRelAngle, HorzRelAngle_norm), quiebre
+     (RelHeight, RelSide_norm, Extension), quiebre
      inducido (InducedVertBreak, HorzBreak_norm, TotalInducedBreak, BreakAngle_deg,
      SpinToBreakRatio) y geometría de brazo (arm_slot_deg, PitcherThrows).
    - Arsenal relacional y túneles: velo_diff_vs_fb, ivb_diff_vs_fb, hb_diff_vs_fb,
-     tunnel_dist_release_in, tunnel_sim_release, tunnel_dist_170ms_in,
-     tunnel_sim_170ms y pitch_usage_pct.
+     tunnel_dist_release_in, tunnel_sim_release y pitch_usage_pct.
+   - SIN PROXIES DE UBICACION (segunda reapertura de HACK-010): VertRelAngle, HorzRelAngle_norm,
+     tunnel_dist_170ms_in y tunnel_sim_170ms salen de Stuff+ porque, junto con soltura,
+     velocidad y movimiento, determinan la ubicacion en el plato (R2 fuera de muestra ~0.99
+     al reconstruir PlateLocHeight/PlateLocSide). TRAJECTORY_PROXY_COLS las lista junto con
+     los angulos de llegada y assert_valid_stuff_features lanza ValueError si alguna entra.
+     Siguen disponibles para Location+ y Pitching+.
    - CERO DATA LEAKAGE: Whitelist estricta que excluye terminantemente ubicación
      de plato (PlateLoc*), conteo (Balls, Strikes, count, Outs), lateralidad de
      bateador (BatterSide, is_same_hand), secuencia (prev_pitch_id), ángulos de
@@ -60,7 +65,20 @@ Arquitectura y Principios Físicos:
      escala (mu_neutral, sigma_neutral) para cuantificar la pérdida/ganancia aerodinámica neta.
    - delta_stuff_cdmx: stuff_plus_cdmx - stuff_plus_neutral.
 
-5. Explicabilidad SHAP (TreeSHAP exacto nativo de LightGBM):
+5. Regularizacion de LightGBM elegida con CV por pitcher (HACK-010, segunda reapertura):
+   - Datos: SOLO No Altitude, year <= 2025 (los datos de entrenamiento del canal Stuff); nunca
+     se miran los holdouts de HACK-012 (split por temporada 2026 ni parque Extreme).
+   - Rejilla (12 combinaciones, learning_rate=0.05 y n_estimators=100 fijos):
+     num_leaves {7, 15} x min_child_samples {200, 1000} x reg_lambda {1, 30, 300}.
+     min_child_samples se limita a n_entrenamiento//5 en datos pequenos.
+   - Metrica: RMSE del residuo xrv_pitcher (y - baseline_conteo) fuera de muestra (OOF) con
+     GroupKFold de 3 folds por pitcher_anon_id; si hay mas de CV_MAX_ROWS (60,000) filas se usa
+     una submuestra estratificada por pitcher (misma fraccion por pitcher, semilla fija).
+   - Con menos de CV_MIN_ROWS (5,000) filas no se busca (LGBM_DEFAULT_PARAMS).
+   - La combinacion ganadora se comparte por los 8 submodelos; queda en self.best_lgbm_params_
+     y la tabla completa en self.lgbm_cv_results_.
+
+6. Explicabilidad SHAP (TreeSHAP exacto nativo de LightGBM):
    - Descompone la predicción del pitcheo mediante booster_.predict(X_row, pred_contrib=True),
      entregando base_value, shap_values por feature y rankings de factores positivos y negativos.
 """
@@ -96,8 +114,6 @@ STUFF_FEATURES: list[str] = [
     "HorzBreak_norm",
     "TotalInducedBreak",
     "BreakAngle_deg",
-    "VertRelAngle",
-    "HorzRelAngle_norm",
     "SpinToBreakRatio",
     "arm_slot_deg",
     "PitcherThrows",
@@ -106,11 +122,38 @@ STUFF_FEATURES: list[str] = [
     "hb_diff_vs_fb",
     "tunnel_dist_release_in",
     "tunnel_sim_release",
-    "tunnel_dist_170ms_in",
-    "tunnel_sim_170ms",
     "pitch_usage_pct",
 ]
 VALID_STUFF_FEATURES = frozenset(STUFF_FEATURES)
+
+# Proxies de trayectoria/ubicacion: la fisica es determinista (punto y angulos de soltura +
+# velocidad + movimiento => ubicacion en el plato), asi que estas columnas decodifican
+# PlateLocHeight/PlateLocSide (R2 fuera de muestra ~0.99 con la lista anterior). Siguen
+# disponibles para Location+ y Pitching+ (HACK-011), pero NUNCA entran a Stuff+.
+TRAJECTORY_PROXY_COLS: list[str] = [
+    "VertRelAngle",
+    "HorzRelAngle",
+    "HorzRelAngle_norm",
+    "VertApprAngle",
+    "HorzApprAngle",
+    "tunnel_dist_170ms_in",
+    "tunnel_sim_170ms",
+]
+
+# Rejilla de regularizacion de LightGBM (12 combinaciones), elegida con CV por pitcher
+# SOLO en No Altitude, year <= 2025 (ver StuffPlusModel._select_lgbm_params).
+LGBM_GRID_NUM_LEAVES: tuple[int, ...] = (7, 15)
+LGBM_GRID_MIN_CHILD: tuple[int, ...] = (200, 1000)
+LGBM_GRID_REG_LAMBDA: tuple[float, ...] = (1.0, 30.0, 300.0)
+LGBM_FIXED_PARAMS: dict[str, Any] = {"learning_rate": 0.05, "n_estimators": 100}
+CV_MAX_ROWS: int = 60_000
+# Con menos filas la CV por pitcher no es informativa (p. ej. fixtures sinteticos): se usa
+# LGBM_DEFAULT_PARAMS sin buscar en la rejilla.
+CV_MIN_ROWS: int = 5_000
+LGBM_DEFAULT_PARAMS: dict[str, Any] = {
+    "num_leaves": 15, "min_child_samples": 20, "reg_lambda": 1.0, **LGBM_FIXED_PARAMS,
+}
+CV_FOLDS: int = 3
 
 # Targets binarios oficiales de resultado
 BINARY_TARGETS = [c for c in TARGET_COLS if c != "xrv_pitcher"]
@@ -138,6 +181,14 @@ def assert_valid_stuff_features(feature_cols: Sequence[str]) -> None:
     """
     feature_list = list(feature_cols)
     assert_no_leakage(feature_list, "stuff")
+
+    proxies = [c for c in feature_list if c in TRAJECTORY_PROXY_COLS]
+    if proxies:
+        raise ValueError(
+            f"Features no autorizadas detectadas en StuffPlusModel: {proxies}. "
+            f"Son proxies de trayectoria/ubicacion (TRAJECTORY_PROXY_COLS={TRAJECTORY_PROXY_COLS}) "
+            "que reconstruyen PlateLoc*; solo Location+ y Pitching+ pueden usarlos."
+        )
 
     unauthorized = [c for c in feature_list if c not in VALID_STUFF_FEATURES]
     if unauthorized:
@@ -183,10 +234,6 @@ def _prepare_stuff_features(
             elif col == "RelSide_norm" and "RelSide" in df.columns and "PitcherThrows" in df.columns:
                 hand_sign = np.where(df["PitcherThrows"].astype(str).str.upper().str.startswith("R"), 1.0, -1.0)
                 X[col] = pd.to_numeric(df["RelSide"], errors="coerce").fillna(0.0) * hand_sign
-                continue
-            elif col == "HorzRelAngle_norm" and "HorzRelAngle" in df.columns and "PitcherThrows" in df.columns:
-                hand_sign = np.where(df["PitcherThrows"].astype(str).str.upper().str.startswith("R"), 1.0, -1.0)
-                X[col] = pd.to_numeric(df["HorzRelAngle"], errors="coerce").fillna(0.0) * hand_sign
                 continue
             elif col in medians:
                 X[col] = float(medians[col])
@@ -251,6 +298,9 @@ class StuffPlusModel:
         # Registro auditable de predicciones Out-Of-Fold (OOF)
         self.oof_fold_assignment_: np.ndarray | None = None
         self.best_alpha_: float = 1.0
+        # Hiperparametros de LightGBM elegidos por CV por pitcher (No Altitude, year <= 2025)
+        self.best_lgbm_params_: dict[str, Any] = {}
+        self.lgbm_cv_results_: list[dict[str, Any]] = []
         # Diccionario congelado de referencia de recta primaria por lanzador
         self.primary_fb_ref_dict_: dict[Any, dict[str, Any]] = {}
         # Baseline de conteo usado SOLO como offset (nunca como feature)
@@ -284,8 +334,8 @@ class StuffPlusModel:
 
         num_cols = [
             "RelSpeed", "SpinRate", "SpinAxis_sin", "SpinAxis_cos",
-            "RelHeight", "RelSide_norm", "Extension", "VertRelAngle",
-            "HorzRelAngle_norm", "arm_slot_deg", "InducedVertBreak",
+            "RelHeight", "RelSide_norm", "Extension",
+            "arm_slot_deg", "InducedVertBreak",
             "HorzBreak_norm", "ZoneSpeed",
         ]
         available_num = [c for c in num_cols if c in fb_sea_level.columns]
@@ -372,8 +422,6 @@ class StuffPlusModel:
                 fb_row["RelHeight"] = float(row.get("RelHeight", 5.8))
                 fb_row["RelSide_norm"] = float(row.get("RelSide_norm", 1.8))
                 fb_row["Extension"] = float(row.get("Extension", 6.0))
-                fb_row["VertRelAngle"] = float(row.get("VertRelAngle", -2.0))
-                fb_row["HorzRelAngle_norm"] = float(row.get("HorzRelAngle_norm", 0.0))
                 fb_row["arm_slot_deg"] = float(row.get("arm_slot_deg", 50.0))
                 fb_row["PitcherThrows"] = row.get("PitcherThrows", "Right")
 
@@ -499,6 +547,9 @@ class StuffPlusModel:
             y_t = pd.to_numeric(df_stuff_train[tgt], errors="coerce").fillna(0.0).to_numpy(dtype=np.float64)
             resid[tgt] = y_t - base_train[tgt].to_numpy(dtype=np.float64)
 
+        # 6c. Regularizacion de LightGBM: CV por pitcher solo en este conjunto (No Altitude, <= 2025)
+        self._select_lgbm_params(X_train, resid["xrv_pitcher"], df_stuff_train)
+
         # 7. Partición para predicciones Out-Of-Fold (OOF)
         if "pitcher_anon_id" in df_stuff_train.columns:
             n_pitchers = df_stuff_train["pitcher_anon_id"].nunique()
@@ -521,10 +572,9 @@ class StuffPlusModel:
             self.oof_fold_assignment_[val_idx] = fold_idx
             X_tr = X_train.iloc[train_idx]
             X_val = X_train.iloc[val_idx]
-            min_child_fold = min(20, max(2, len(X_tr) // 5))
 
             for tgt in TARGET_COLS:
-                sub_fold = self._fit_residual_submodel(X_tr, resid[tgt][train_idx], min_child_fold)
+                sub_fold = self._fit_residual_submodel(X_tr, resid[tgt][train_idx], self.best_lgbm_params_)
                 oof_preds[tgt][val_idx] = self._predict_residual_submodel(sub_fold, X_val)
 
         # 9. Construcción de matriz OOF con restricción de signos físicos:
@@ -568,11 +618,10 @@ class StuffPlusModel:
             self.meta_ridge_.coef_[-1] = 1.0
 
         # 11. Reajuste de los 8 submodelos sobre todo df_stuff_train para producción e inferencia
-        min_child_full = min(20, max(2, n_samples // 5))
         self.submodels_ = {}
 
         for tgt in TARGET_COLS:
-            self.submodels_[tgt] = self._fit_residual_submodel(X_train, resid[tgt], min_child_full)
+            self.submodels_[tgt] = self._fit_residual_submodel(X_train, resid[tgt], self.best_lgbm_params_)
 
         reg_xrv = self.submodels_["xrv_pitcher"]
         self.booster_ = reg_xrv.booster_ if hasattr(reg_xrv, "booster_") else None
@@ -591,19 +640,77 @@ class StuffPlusModel:
         return self
 
     @staticmethod
-    def _fit_residual_submodel(X: pd.DataFrame, r: np.ndarray, min_child: int) -> Any:
+    def _fit_residual_submodel(X: pd.DataFrame, r: np.ndarray, params: dict[str, Any]) -> Any:
         """Ajusta un regresor LightGBM sobre un residuo; constante si el residuo es degenerado."""
         if len(r) == 0 or float(np.std(r)) < 1e-12:
             return ("constant", float(np.mean(r)) if len(r) else 0.0)
-        reg = LGBMRegressor(
-            random_state=42,
-            n_estimators=60,
-            learning_rate=0.05,
-            min_child_samples=min_child,
-            verbose=-1,
-        )
+        p = dict(params)
+        p["min_child_samples"] = int(min(p.get("min_child_samples", 20), max(2, len(r) // 5)))
+        reg = LGBMRegressor(random_state=42, verbose=-1, **p)
         reg.fit(X, r)
         return reg
+
+    def _select_lgbm_params(
+        self,
+        X: pd.DataFrame,
+        r_xrv: np.ndarray,
+        df_ref: pd.DataFrame,
+    ) -> None:
+        """
+        Elige hiperparametros de LightGBM con CV por pitcher_anon_id (CV_FOLDS folds) sobre la
+        rejilla LGBM_GRID_* (ver docstring del modulo, seccion 5). X/r_xrv/df_ref ya son
+        exclusivamente No Altitude, year <= 2025. Metrica: RMSE OOF del residuo de xrv_pitcher.
+        Si hay mas de CV_MAX_ROWS filas, usa una submuestra estratificada por pitcher.
+        """
+        n = len(X)
+        if n < CV_MIN_ROWS:
+            self.lgbm_cv_results_ = []
+            self.best_lgbm_params_ = dict(LGBM_DEFAULT_PARAMS)
+            return
+        groups = (
+            df_ref["pitcher_anon_id"].to_numpy() if "pitcher_anon_id" in df_ref.columns
+            else np.arange(n) // max(1, n // 10)
+        )
+        idx = np.arange(n)
+        if n > CV_MAX_ROWS:
+            frac = CV_MAX_ROWS / n
+            rng = np.random.default_rng(42)
+            keep = np.zeros(n, dtype=bool)
+            for g_idx in pd.Series(np.arange(n)).groupby(groups, sort=True).indices.values():
+                k = max(1, int(round(frac * len(g_idx))))
+                keep[rng.choice(g_idx, size=min(k, len(g_idx)), replace=False)] = True
+            idx = np.flatnonzero(keep)
+        Xs, ys, gs = X.iloc[idx], r_xrv[idx], groups[idx]
+
+        if len(np.unique(gs)) >= CV_FOLDS:
+            splits = list(GroupKFold(n_splits=CV_FOLDS).split(Xs, groups=gs))
+        else:
+            splits = list(KFold(n_splits=min(CV_FOLDS, max(2, len(Xs) // 10)), shuffle=True, random_state=42).split(Xs))
+
+        results: list[dict[str, Any]] = []
+        seen: set[tuple[Any, ...]] = set()
+        for nl in LGBM_GRID_NUM_LEAVES:
+            for mc in LGBM_GRID_MIN_CHILD:
+                for rl in LGBM_GRID_REG_LAMBDA:
+                    params = {"num_leaves": nl, "min_child_samples": mc, "reg_lambda": rl, **LGBM_FIXED_PARAMS}
+                    # En datos pequenos min_child se limita; evita evaluar duplicados
+                    mc_eff = int(min(mc, max(2, (len(Xs) * (CV_FOLDS - 1) // CV_FOLDS) // 5)))
+                    key = (nl, mc_eff, rl)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    oof = np.zeros(len(Xs), dtype=np.float64)
+                    for tr, va in splits:
+                        sub = self._fit_residual_submodel(Xs.iloc[tr], ys[tr], params)
+                        oof[va] = self._predict_residual_submodel(sub, Xs.iloc[va])
+                    rmse = float(np.sqrt(np.mean((ys - oof) ** 2)))
+                    results.append({**params, "cv_rmse": rmse, "n_cv_rows": int(len(Xs))})
+
+        best = min(results, key=lambda d: d["cv_rmse"])
+        self.lgbm_cv_results_ = results
+        self.best_lgbm_params_ = {
+            k: best[k] for k in ("num_leaves", "min_child_samples", "reg_lambda", "learning_rate", "n_estimators")
+        }
 
     @staticmethod
     def _predict_residual_submodel(sub: Any, X: pd.DataFrame) -> np.ndarray:
