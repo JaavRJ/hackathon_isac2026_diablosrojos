@@ -497,3 +497,110 @@ def repertoire_rows(rep: Sequence[dict]) -> str:
                    f'<span class="dr-num" style="font-weight:800">{r["median_stuff_plus_cdmx"]:.1f}</span>'
                    f'<small>{r["n_pitches"]} lanz.</small></div>')
     return "".join(out)
+
+
+# ----------------------------------------------------------------------------
+# VeloVision (HACK-017, 17-C)
+# ----------------------------------------------------------------------------
+ICONS.update({
+    "camera": '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    "person": '<circle cx="12" cy="5" r="2.5"/><path d="M12 8v7M7 10l5-2 5 2M12 15l-3 6M12 15l3 6"/>',
+    "ruler": '<path d="M3 15L15 3l6 6L9 21zM7 11l2 2M10 8l2 2M13 5l2 2"/>',
+    "film": '<path d="M4 4h16v16H4zM8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4"/>',
+    "lock": '<path d="M6 11h12v9H6zM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>',
+    "check": '<path d="M4 12l5 5L20 6"/>',
+    "upload": '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+    "frames": '<path d="M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6"/>',
+})
+
+
+def disclaimer_badge(text: str) -> str:
+    """Badge permanente de honestidad (texto literal)."""
+    return f'<div class="dr-disclaimer" role="note">{icon("lock")}<span>{esc(text)}</span></div>'
+
+
+def capture_guide(items: Sequence[tuple[str, str, str]]) -> str:
+    """Guia de captura con iconos: ``[(icono, titulo, detalle)]``."""
+    cells = "".join(
+        f'<div class="dr-guide"><div class="dr-guide-ic">{icon(ic)}</div><div><b>{esc(t)}</b>'
+        f'<div class="note">{esc(d)}</div></div></div>' for ic, t, d in items)
+    return f'<div class="dr-guides">{cells}</div>'
+
+
+def frame_strip(n_frames: int, suggested: int, candidates: Sequence[int], selected: int, confirmed: int | None = None) -> str:
+    """Barra de frames: release sugerido (turquesa), candidatos (navy tenue), seleccionado y confirmado."""
+    span = max(n_frames - 1, 1)
+    pct = lambda i: 100.0 * i / span
+    marks = "".join(f'<i class="cand" style="left:{pct(c):.2f}%" title="candidato: frame {c}"></i>' for c in candidates)
+    marks += f'<i class="sug" style="left:{pct(suggested):.2f}%" title="sugerido: frame {suggested}"></i>'
+    if confirmed is not None:
+        marks += f'<i class="conf" style="left:{pct(confirmed):.2f}%" title="confirmado: frame {confirmed}"></i>'
+    marks += f'<u style="left:{pct(selected):.2f}%"></u>'
+    return (f'<div class="dr-fstrip">{marks}</div><div class="dr-zleg"><i style="background:rgba(11,122,102,.35)"></i>sugerido '
+            f'<i style="background:rgba(31,58,95,.35)"></i>candidatos <i style="background:#1F3A5F"></i>seleccionado</div>')
+
+
+def measure_card(icon_name: str, title: str, value: float | None, unit: str, error_text: str, badge: str = "",
+                 decimals: int = 1) -> str:
+    """Tarjeta de una medida del video; ``error_text`` va completo (sin prefijo), nunca se oculta el error."""
+    v = "—" if value is None else f"{value:.{decimals}f}"
+    b = f'<span class="tag">{esc(badge)}</span>' if badge else ""
+    return (f'<div class="dr-card dr-measure"><div class="dr-h4">{icon(icon_name)}{esc(title)}</div>'
+            f'<div class="v dr-num">{v}<small>{esc(unit)}</small></div>'
+            f'<div class="note">{esc(error_text)}</div>{b}</div>')
+
+
+def empty_state(icon_name: str, title: str, text: str = "") -> str:
+    """Estado vacio elegante (sin la etiqueta 'en espera')."""
+    tx = f'<p class="mut">{esc(text)}</p>' if text else ""
+    return f'<div class="dr-empty">{icon(icon_name)}<h4>{esc(title)}</h4>{tx}</div>'
+
+
+def family_ranges(families: Sequence[dict], min_pitchers: int) -> str:
+    """Una fila por familia: barra p25-p75 (solida), p10-p90 (tenue), mediana, delta con simbolo y n_pitchers.
+
+    Las familias en INSUFFICIENT_PEERS salen atenuadas y sin cifras.
+    """
+    ok = [f for f in families if f["status"] == "OK"]
+    if ok:
+        lo = min(f["stuff_plus_cdmx"]["p10"] for f in ok)
+        hi = max(f["stuff_plus_cdmx"]["p90"] for f in ok)
+        pad = max((hi - lo) * 0.08, 0.5)
+        lo, hi = lo - pad, hi + pad
+    else:
+        lo, hi = 0.0, 1.0
+    span = (hi - lo) or 1.0
+    pc = lambda v: max(0.0, min(100.0, 100.0 * (v - lo) / span))
+    rows = []
+    for f in families:
+        if f["status"] != "OK":
+            rows.append(f'<div class="dr-fam dim"><span class="nm">{esc(f["pitch_id"])}</span>'
+                        f'<span class="mut">INSUFFICIENT_PEERS · {f["n_pitchers"]} pitchers (mínimo {min_pitchers}): sin cifras</span></div>')
+            continue
+        s, d = f["stuff_plus_cdmx"], f["delta_stuff_cdmx"]
+        rows.append(
+            f'<div class="dr-fam"><span class="nm">{esc(f["pitch_id"])}</span>'
+            f'<span class="dr-frange"><b class="wide" style="left:{pc(s["p10"]):.1f}%;width:{pc(s["p90"]) - pc(s["p10"]):.1f}%"></b>'
+            f'<b class="iqr" style="left:{pc(s["p25"]):.1f}%;width:{pc(s["p75"]) - pc(s["p25"]):.1f}%"></b>'
+            f'<i style="left:{pc(s["p50"]):.1f}%"></i></span>'
+            f'<span class="dr-num rng">{s["p50"]:.1f} <small>[{s["p25"]:.1f}–{s["p75"]:.1f}]</small></span>'
+            f'<span>{delta_badge(d["p50"], 2)}</span><span class="mut n">{f["n_pitchers"]} pitchers</span></div>')
+    leg = ('<div class="dr-legend"><span>barra sólida = p25–p75</span><span>franja tenue = p10–p90</span>'
+           '<span>marca = mediana de Stuff+ CDMX</span><span>Δ = ΔStuff+ CDMX mediano (CDMX − mar)</span></div>')
+    return f'<div class="dr-fams">{"".join(rows)}</div>{leg}'
+
+
+def narrowing_table(rows: Sequence[dict]) -> str:
+    """Antes/despues del ancho p25-p75 al agregar el radar (se reporta, no se exige mejora)."""
+    def fmt(v):
+        return "—" if v is None else f"{v:.2f}"
+
+    body = []
+    for r in rows:
+        ch = r["change"]
+        chs = "—" if ch is None else f"{ch:+.2f}".replace("-", "−")
+        body.append(f'<tr><td><b>{esc(r["pitch_id"])}</b></td><td>{fmt(r["width_p25_p75_without_velo"])}</td>'
+                    f'<td>{fmt(r["width_p25_p75_with_velo"])}</td><td>{chs}</td>'
+                    f'<td>{r["n_pitchers_without_velo"]} → {r["n_pitchers_with_velo"]}</td></tr>')
+    return ('<table class="dr-tbl"><thead><tr><th>Familia</th><th>Ancho p25–p75 sin radar</th><th>con radar</th>'
+            f'<th>Cambio</th><th>Pitchers</th></tr></thead><tbody>{"".join(body)}</tbody></table>')

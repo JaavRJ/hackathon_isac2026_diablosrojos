@@ -128,12 +128,25 @@ def build_prospect_card(
     observed_velo_mph: float | None = None,
     min_pitchers: int = 8,
     catalog=None,
+    slot_error_kind: str | None = None,
 ) -> dict[str, Any]:
-    """Ficha de prospecto: rangos de Stuff+ CDMX por familia, sin valor puntual."""
+    """Ficha de prospecto: rangos de Stuff+ CDMX por familia, sin valor puntual.
+
+    Ventana de slot: ``max(6, slot_error_deg)``. ``slot_error_deg`` ya es una
+    cota (desviación máxima por esquinas, no una desviación estándar), por eso
+    no se duplica. Si es None, negativo o NaN se trata como "aún no medido"
+    (ventana 6). Lanza ValueError si ``arm_slot_dataset_deg`` es NaN.
+    """
     hand = normalize_throws(throws)
     slot = float(arm_slot_dataset_deg)
-    has_error = slot_error_deg is not None
-    window = max(MIN_WINDOW_DEG, 2.0 * float(slot_error_deg)) if has_error else MIN_WINDOW_DEG
+    if not np.isfinite(slot):
+        raise ValueError("arm_slot_dataset_deg no es un número finito (NaN/inf)")
+    has_error = (
+        slot_error_deg is not None
+        and np.isfinite(float(slot_error_deg))
+        and float(slot_error_deg) >= 0
+    )
+    window = max(MIN_WINDOW_DEG, float(slot_error_deg)) if has_error else MIN_WINDOW_DEG
 
     df = _load_catalog(catalog)
     sub = _filter_catalog(df, hand, slot, window, rel_height_ft, observed_velo_mph)
@@ -154,7 +167,9 @@ def build_prospect_card(
     return {
         "families": _families(sub, min_pitchers),
         "window_deg": window,
-        "error_source": "medido" if has_error else "aún no medido",
+        # slot_error_kind (p. ej. "sistemático supuesto", "medido (MAE de validación)",
+        # "combinado (MAE + sistemático)") etiqueta de dónde sale el error; sin él, la lógica original.
+        "error_source": slot_error_kind or ("medido" if has_error else "aún no medido"),
         "filters_applied": filters,
         "n_pitchers_total": int(sub["pitcher_anon_id"].nunique()),
         "sculptor_params": {
@@ -175,11 +190,12 @@ def velo_narrowing_report(
     slot_error_deg: float | None = None,
     min_pitchers: int = 8,
     catalog=None,
+    slot_error_kind: str | None = None,
 ) -> list[dict[str, Any]]:
     """Reporta (sin exigir mejora) el ancho p25-p75 de Stuff+ CDMX por familia
     sin y con ``observed_velo_mph``."""
     kw = dict(rel_height_ft=rel_height_ft, slot_error_deg=slot_error_deg,
-              min_pitchers=min_pitchers, catalog=catalog)
+              min_pitchers=min_pitchers, catalog=catalog, slot_error_kind=slot_error_kind)
     base = build_prospect_card(arm_slot_dataset_deg, throws, **kw)
     with_v = build_prospect_card(arm_slot_dataset_deg, throws,
                                  observed_velo_mph=observed_velo_mph, **kw)

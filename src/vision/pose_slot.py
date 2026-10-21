@@ -25,35 +25,65 @@ Convenciones
 * Un arreglo sin ``PoseSequence`` asume cuadro de 640x480 y 30 fps
   (``DEFAULT_WIDTH/HEIGHT/FPS``) para pasar de coordenadas normalizadas a pixeles.
 
-Heuristicas documentadas
-------------------------
-* Escala pixeles->pies: ``ANTHROPOMETRIC_NOSE_FRACTION = 0.93``. La altura de la
-  nariz sobre el suelo es ~0.93 de la estatura (el ojo esta a ~0.936 H y la nariz
-  un poco abajo). Distancia nariz->tobillos (punto medio) en pixeles
-  = 0.93 * estatura; se toma el percentil 80 de la distancia sobre los frames
-  validos, para quedarse con el sujeto erguido y no con la zancada agachada.
-* ``rel_height_ft``: altura de la muñeca sobre el tobillo de apoyo (el del lado
-  opuesto al brazo lanzador), en pies. ``rel_side_ft``: distancia horizontal de
-  la muñeca al centro del cuerpo (punto medio de caderas), positiva hacia el
-  lado del brazo lanzador (el signo sale de la posicion de los hombros, asi que
-  no depende de hacia donde mira la camara).
-* ``arm_slot_dataset_deg``: formula EXACTA de ``src/features/physical.py:190``:
-  ``clip(degrees(atan2(rel_height - 4.0, |rel_side| + 0.5)), 0, 90)``.
-* ``arm_angle_biomech_deg``: angulo hombro->muñeca sobre la horizontal,
-  ``atan2(hombro_y - muñeca_y, |dx|)`` en grados: +90 = brazo vertical arriba,
-  0 = horizontal, valores negativos (hasta -90) si la muñeca queda por debajo
-  del hombro. Solo informativo: NO filtra el catalogo.
-* Release: maxima velocidad de la muñeca lanzadora (en torsos/segundo) ponderada
-  por la extension del brazo (|hombro-muñeca| / longitud del brazo, umbral
+Origen de las medidas (honestidad, AGENTS.md sec. 2 puntos 5 y 6)
+-----------------------------------------------------------------
+``arm_slot_dataset_deg`` usa la MISMA FORMULA que el dataset
+(``src/features/physical.py:190``), pero la igualdad es solo de FORMULA: los
+INSUMOS (``rel_height_ft``, ``rel_side_ft``) se APROXIMAN desde un video
+monocular con supuestos, no se miden con el origen de TrackMan.
+
+* ``RelHeight`` (TrackMan) = altura de la pelota sobre el nivel del campo/plato.
+  Aqui: ``rel_height_ft = (muneca sobre la SUELA del pie de apoyo)
+  + MOUND_HEIGHT_FT + HAND_TO_BALL_FT``; la suela es el tobillo de apoyo menos
+  ``ANKLE_TO_SOLE_FT``.
+  - ``MOUND_HEIGHT_FT = 10/12`` (10 in): REGLA. Las Reglas Oficiales de Beisbol
+    (Official Baseball Rules, reglas 2.01 y 5.01, diagrama del campo) fijan el
+    tope de la plancha del pitcher 10 in sobre el nivel del plato; la LMB juega
+    con reglas oficiales. Es una cota: el pie de apoyo cae delante de la plancha,
+    en la pendiente del montículo, asi que la altura real del pie es algo menor
+    (cubierto por ``REL_HEIGHT_SYS_ERR_FT``).
+  - ``ANKLE_TO_SOLE_FT = 0.25`` (rango 0.20-0.30 ft): SUPUESTO antropometrico
+    no calibrado (landmark de tobillo de MediaPipe -> suela).
+  - ``HAND_TO_BALL_FT = 0.40`` (rango 0.20-0.60 ft): SUPUESTO antropometrico
+    no calibrado (centro de la pelota sobre la muneca al soltar; depende del
+    slot, aqui es un valor fijo).
+* ``RelSide`` (TrackMan) = distancia lateral respecto a la linea plato-goma.
+  Aqui el origen lateral es la x del pie de apoyo al INICIO de la entrega (mediana
+  de los primeros frames con buena visibilidad, antes de la zancada), como proxy
+  de la posicion sobre la goma (camara fija y lanzador sin desplazarse de la
+  goma: supuestos). Si no se puede, se usa el centro de cadera del frame y se
+  avisa en ``quality_issues`` y ``origin_notes``. ``rel_side_ft`` es positivo hacia
+  el lado del brazo lanzador (signo por hombros, independiente de la camara).
+* Error sistematico DECLARADO (no esta en el MAE contra anotadores):
+  ``REL_HEIGHT_SYS_ERR_FT = 0.4`` y ``REL_SIDE_SYS_ERR_FT = 0.5`` ft son
+  SUPUESTOS que cubren la incertidumbre de las constantes, de la pendiente del
+  montículo y de la posicion real sobre la goma. ``slot_sys_err_deg`` es la
+  desviacion maxima del slot en las 4 esquinas altura +/- err x lado +/- err
+  respecto al slot central. ``combined_slot_error_deg`` lo suma en cuadratura al MAE.
+* Escala pixeles->pies: ``ANTHROPOMETRIC_NOSE_FRACTION = 0.93`` es un SUPUESTO
+  no calibrado con datos propios: se asume la nariz a ~0.93 de la estatura. Se
+  usa distancia nariz->tobillos (punto medio) = 0.93 * estatura, percentil 80
+  sobre los frames validos (supone al lanzador casi erguido en parte del clip).
+* ``arm_angle_biomech_deg``: angulo hombro->muneca sobre la horizontal,
+  ``atan2(hombro_y - muneca_y, |dx|)``: +90 = brazo vertical arriba, 0 =
+  horizontal, negativo si la muneca queda por debajo del hombro. Solo
+  informativo: NO filtra el catalogo.
+* Release: maxima velocidad de la muneca lanzadora (en torsos/segundo) ponderada
+  por la extension del brazo (|hombro-muneca| / longitud del brazo, umbral
   0.6-0.9) y por estar "por delante" del hombro (en 2D: mas lejos de la cadera
   que el hombro). Tolera landmarks faltantes (visibilidad < 0.3 => NaN).
-* Calidad (0-1) = 0.5*visibilidad de landmarks clave + 0.25*tamaño del sujeto
+* Calidad (0-1) = 0.5*visibilidad de landmarks clave + 0.25*tamano del sujeto
   (alto nariz->tobillo / alto del cuadro, pleno >= 0.5) + 0.25*cuerpo completo
-  en cuadro; x0.85 si la vista parece de perfil. Umbral sugerido ``QUALITY_MIN``.
+  en cuadro; x0.85 si la vista parece de perfil (mediana de los primeros frames
+  de la entrega, para no penalizar la rotacion del tronco al soltar). Si el
+  tobillo de apoyo es poco visible la calidad baja a <= 0.5 y se avisa. Umbral
+  sugerido ``QUALITY_MIN``.
 
-Rendimiento (CPU, medido en 17-A): ver ``tests/test_vision_core.py`` (la parte
-de medicion/deteccion es del orden de milisegundos por clip; el costo dominante
-es la inferencia de MediaPipe por frame).
+Rendimiento (CPU, medido en 17-A): clip de 5 s (150 frames, 30 fps) reducido a 640 px con el modelo
+``pose_landmarker_full.task``, CPU de la maquina de desarrollo: 5.8 s de extraccion
+(``data/vision_clips/demo_sintetico.mp4``, figura sintetica, 60 frames con pose
+detectada) y 2.3 s en un clip sin persona; deteccion+medicion < 10 ms. Medido el
+2026-10-21; depende del hardware (criterio 8: < 30 s).
 """
 from __future__ import annotations
 
@@ -68,7 +98,13 @@ import cv2
 import numpy as np
 
 # ---------------------------------------------------------------- constantes
-ANTHROPOMETRIC_NOSE_FRACTION = 0.93
+ANTHROPOMETRIC_NOSE_FRACTION = 0.93   # SUPUESTO no calibrado (nariz ~ 0.93 de la estatura)
+MOUND_HEIGHT_FT = 10.0 / 12.0   # REGLA: Official Baseball Rules 2.01/5.01, plancha 10 in sobre el plato
+ANKLE_TO_SOLE_FT = 0.25         # SUPUESTO no calibrado (rango 0.20-0.30 ft): tobillo MediaPipe -> suela
+HAND_TO_BALL_FT = 0.40          # SUPUESTO no calibrado (rango 0.20-0.60 ft): muneca -> centro de pelota
+REL_HEIGHT_SYS_ERR_FT = 0.4     # SUPUESTO: error sistematico de rel_height (constantes, pendiente)
+REL_SIDE_SYS_ERR_FT = 0.5       # SUPUESTO: error sistematico de rel_side (posicion sobre la goma)
+START_FRAMES = 10               # primeros frames de la entrega (origen lateral y vista)
 DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FPS = 640, 480, 30.0
 VIS_MIN = 0.5          # visibilidad para considerar un landmark "visible"
 VIS_NAN = 0.3          # por debajo => landmark tratado como faltante (NaN)
@@ -186,8 +222,31 @@ def _find_model() -> Optional[Path]:
     return None
 
 
-def _make_detector() -> Callable[[np.ndarray], Optional[np.ndarray]]:
-    """Devuelve f(rgb_uint8) -> (33,3) [x,y,vis] o None si no hay persona."""
+class _Detector:
+    """Envoltura con ``__call__(rgb)``, ``close()`` y context manager."""
+
+    def __init__(self, run: Callable[[np.ndarray], Optional[np.ndarray]],
+                 closer: Callable[[], None]) -> None:
+        self._run, self._closer, self.closed = run, closer, False
+
+    def __call__(self, rgb: np.ndarray) -> Optional[np.ndarray]:
+        return self._run(rgb)
+
+    def close(self) -> None:
+        if not self.closed:
+            self.closed = True
+            self._closer()
+
+    def __enter__(self) -> "_Detector":
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+
+def _make_detector() -> _Detector:
+    """Devuelve un detector f(rgb_uint8) -> (33,3) [x,y,vis] o None si no hay persona.
+    Debe cerrarse con ``close()`` o ``with``."""
     import mediapipe as mp  # import tardio: el resto del modulo no lo necesita
 
     if hasattr(mp, "solutions") and hasattr(mp.solutions, "pose"):   # API clasica
@@ -199,7 +258,7 @@ def _make_detector() -> Callable[[np.ndarray], Optional[np.ndarray]]:
             if not res.pose_landmarks:
                 return None
             return np.array([[l.x, l.y, l.visibility] for l in res.pose_landmarks.landmark])
-        return run_classic
+        return _Detector(run_classic, pose.close)
 
     model = _find_model()
     if model is None:
@@ -223,7 +282,7 @@ def _make_detector() -> Callable[[np.ndarray], Optional[np.ndarray]]:
             return None
         return np.array([[l.x, l.y, getattr(l, "visibility", 1.0) or 0.0]
                          for l in res.pose_landmarks[0]])
-    return run_tasks
+    return _Detector(run_tasks, landmarker.close)
 
 
 def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0,
@@ -234,10 +293,11 @@ def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0
     RGB de ancho ``store_width`` (<= target_width) para la barra de frames.
     """
     detector = _make_detector()
+    closer = getattr(detector, "close", None)      # los dobles de prueba pueden no tenerlo
     cap = cv2.VideoCapture(str(video_path))
-    if not cap.isOpened():
-        raise ValueError(f"No se pudo abrir el video: {video_path}")
     try:
+        if not cap.isOpened():
+            raise ValueError(f"No se pudo abrir el video: {video_path}")
         fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
         if not math.isfinite(fps) or fps < 1.0:
             fps = DEFAULT_FPS
@@ -263,6 +323,8 @@ def extract_pose_sequence(video_path: Union[str, Path], max_seconds: float = 6.0
             frames.append(small)
     finally:
         cap.release()
+        if callable(closer):
+            closer()
     if not lms:
         return PoseSequence(np.full((1, NUM_LANDMARKS, 3), np.nan), fps, int(target_width),
                             int(target_width * 3 // 4), None)
@@ -328,9 +390,23 @@ def detect_release_frame(seq: SeqLike, throws: str) -> dict:
 
 # ------------------------------------------------------------------ medicion
 def _arm_slot_dataset(rel_height_ft: float, rel_side_ft: float) -> float:
-    """Misma formula que src/features/physical.py:190-191."""
+    """Misma FORMULA que src/features/physical.py:190-191 (los insumos son aproximados)."""
     rad = math.atan2(rel_height_ft - 4.0, abs(rel_side_ft) + 0.5)
     return float(np.clip(math.degrees(rad), 0.0, 90.0))
+
+
+def _slot_sys_err(rel_h: float, rel_s: float,
+                  err_h: float = REL_HEIGHT_SYS_ERR_FT, err_s: float = REL_SIDE_SYS_ERR_FT) -> float:
+    """Desviacion maxima (grados) del slot en las 4 esquinas altura+/-err x lado+/-err."""
+    center = _arm_slot_dataset(rel_h, rel_s)
+    return float(max(abs(_arm_slot_dataset(rel_h + dh, rel_s + ds) - center)
+                     for dh in (-err_h, err_h) for ds in (-err_s, err_s)))
+
+
+def combined_slot_error_deg(mae_slot_deg: Optional[float], slot_sys_err_deg: float) -> float:
+    """Error total del slot: ``sqrt(mae^2 + sys^2)`` (``mae = 0`` si es None)."""
+    mae = 0.0 if mae_slot_deg is None else float(mae_slot_deg)
+    return float(math.hypot(mae, float(slot_sys_err_deg)))
 
 
 def _pt(seq: PoseSequence, lm: int, i: int) -> np.ndarray:
@@ -344,7 +420,11 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     Devuelve ``rel_height_ft, rel_side_ft, arm_slot_dataset_deg,
     arm_angle_biomech_deg`` (``None`` si no se pudo medir), ``quality_score``
     (0-1), ``quality_issues`` (textos en español con accion), ``quality_ok``
-    (score >= QUALITY_MIN y medicion posible) y ``ft_per_px``.
+    (score >= QUALITY_MIN y medicion posible) y ``ft_per_px``. Declara ademas el
+    error sistematico supuesto: ``rel_height_sys_err_ft``, ``rel_side_sys_err_ft``,
+    ``slot_sys_err_deg`` (propagado por esquinas; None si no se midio) y
+    ``origin_notes`` (como se fijo el origen de altura y lado). La formula del slot
+    es la del dataset; los insumos son aproximaciones (ver docstring del modulo).
     """
     s = _resolve(seq)
     ix = _idx(throws)
@@ -354,7 +434,10 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     issues: list = []
     out = dict(frame_idx=i, throws=str(throws).upper()[:1], height_ft=float(height_ft),
                rel_height_ft=None, rel_side_ft=None, arm_slot_dataset_deg=None,
-               arm_angle_biomech_deg=None, ft_per_px=None)
+               arm_angle_biomech_deg=None, ft_per_px=None,
+               rel_height_sys_err_ft=REL_HEIGHT_SYS_ERR_FT, rel_side_sys_err_ft=REL_SIDE_SYS_ERR_FT,
+               slot_sys_err_deg=None,
+               origin_notes="No se midió: faltan landmarks o escala para fijar el origen de altura y lado.")
 
     key = [NOSE, L_SHOULDER, R_SHOULDER, ix["el"], ix["wr"], L_HIP, R_HIP, L_ANKLE, R_ANKLE]
     vis = np.nan_to_num(lm[key, 2], nan=0.0)
@@ -383,12 +466,18 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     if body_score < 1.0 and finite.any():
         issues.append("Cuerpo cortado: aleja la cámara para que se vean cabeza, brazos y pies completos.")
 
-    # vista no frontal (hombros muy juntos respecto al torso)
+    # vista no frontal (hombros muy juntos respecto al torso), con la MEDIANA de los
+    # primeros frames de la entrega: el frame de soltura rota el tronco y no debe penalizar
     view_factor = 1.0
-    sh_l, sh_r, hp_l, hp_r = (_pt(s, k, i) for k in (L_SHOULDER, R_SHOULDER, L_HIP, R_HIP))
-    if np.isfinite([sh_l, sh_r, hp_l, hp_r]).all():
-        torso = float(np.linalg.norm((sh_l + sh_r) / 2 - (hp_l + hp_r) / 2))
-        if torso > 0 and np.linalg.norm(sh_l - sh_r) / torso < 0.5:
+    ratios = []
+    for j in range(min(T, START_FRAMES)):
+        sh_l, sh_r, hp_l, hp_r = (_pt(s, k, j) for k in (L_SHOULDER, R_SHOULDER, L_HIP, R_HIP))
+        if np.isfinite([sh_l, sh_r, hp_l, hp_r]).all():
+            torso = float(np.linalg.norm((sh_l + sh_r) / 2 - (hp_l + hp_r) / 2))
+            if torso > 0:
+                ratios.append(float(np.linalg.norm(sh_l - sh_r)) / torso)
+    if ratios:
+        if float(np.median(ratios)) < 0.5:
             view_factor = 0.85
             issues.append("Vista de perfil: coloca la cámara de frente o ligeramente de 3/4 "
                           "(a la altura del pecho) para medir el slot.")
@@ -421,18 +510,40 @@ def measure_release(seq: SeqLike, frame_idx: int, throws: str, height_ft: float)
     sh_t, wr_t = _pt(s, ix["sh"], i), _pt(s, ix["wr"], i)
     sh_o = _pt(s, ix["osh"], i)
     hips = np.array([_pt(s, ix["hip"], i), _pt(s, ix["ohip"], i)])
-    ank_sup = [(_vis(s, ix["oank"])[i], _pt(s, ix["oank"], i)), (_vis(s, ix["ank"])[i], _pt(s, ix["ank"], i))]
-    ank_sup = [p for v, p in sorted(ank_sup, key=lambda t: -t[0]) if np.isfinite(p).all()]
-    ok_geom = bool(np.isfinite([sh_t, wr_t, sh_o]).all()) and ank_sup and np.isfinite(hips).all()
-    if ft_per_px is not None and ok_geom and vis[4] >= VIS_NAN:
-        support = ank_sup[0]
-        center_x = float(hips[:, 0].mean())
+    support = _pt(s, ix["oank"], i)              # tobillo de apoyo (lado opuesto al brazo)
+    sup_vis = float(_vis(s, ix["oank"])[i])
+    if sup_vis < VIS_MIN:                        # NO se sustituye en silencio por el otro tobillo
+        quality = min(quality, 0.5)
+        issues.append("Tobillo de apoyo poco visible: la altura y el lado dependen de ese pie. "
+                      "Regraba con el pie de apoyo completo en cuadro y sin objetos que lo tapen.")
+    ok_geom = bool(np.isfinite([sh_t, wr_t, sh_o, support]).all()) and bool(np.isfinite(hips).all())
+    if ft_per_px is not None and ok_geom and vis[4] >= VIS_NAN and sup_vis >= VIS_NAN:
+        # origen lateral: x del pie de apoyo al inicio de la entrega (proxy de la goma)
+        xs = [float(_pt(s, ix["oank"], j)[0]) for j in range(min(T, max(START_FRAMES, 1)))
+              if _vis(s, ix["oank"])[j] >= VIS_MIN and np.isfinite(_pt(s, ix["oank"], j)[0])]
+        if xs:
+            origin_x = float(np.median(xs))
+            origin_notes = ("Altura: muñeca sobre la suela del pie de apoyo + montículo reglamentario "
+                            f"({MOUND_HEIGHT_FT * 12:.0f} in) + mano-pelota ({HAND_TO_BALL_FT:.2f} ft, supuesto). "
+                            "Lado: respecto a la x del pie de apoyo al inicio de la entrega "
+                            f"({len(xs)} frame(s)), como proxy de la goma (cámara fija, supuesto).")
+        else:
+            origin_x = float(hips[:, 0].mean())
+            origin_notes = ("Altura: muñeca sobre la suela del pie de apoyo + montículo reglamentario "
+                            f"({MOUND_HEIGHT_FT * 12:.0f} in) + mano-pelota ({HAND_TO_BALL_FT:.2f} ft, supuesto). "
+                            "Lado: no hubo un pie de apoyo visible al inicio de la entrega; se usó el centro "
+                            "de cadera del frame, que se desvía de la goma con la zancada.")
+            issues.append("Sin pie de apoyo visible al inicio de la entrega: el lado se mide respecto "
+                          "al centro de cadera (menos fiable). Incluye los primeros frames de la entrega.")
+        out["origin_notes"] = origin_notes
         sign = 1.0 if sh_t[0] >= sh_o[0] else -1.0
-        rel_h = (support[1] - wr_t[1]) * ft_per_px
-        rel_s = (wr_t[0] - center_x) * sign * ft_per_px
+        rel_h = ((support[1] - wr_t[1]) * ft_per_px
+                 + ANKLE_TO_SOLE_FT + MOUND_HEIGHT_FT + HAND_TO_BALL_FT)
+        rel_s = (wr_t[0] - origin_x) * sign * ft_per_px
         out["rel_height_ft"] = float(rel_h)
         out["rel_side_ft"] = float(rel_s)
         out["arm_slot_dataset_deg"] = _arm_slot_dataset(rel_h, rel_s)
+        out["slot_sys_err_deg"] = _slot_sys_err(rel_h, rel_s)
         out["arm_angle_biomech_deg"] = float(math.degrees(
             math.atan2(sh_t[1] - wr_t[1], abs(wr_t[0] - sh_t[0]))))
     else:

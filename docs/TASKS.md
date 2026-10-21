@@ -30,7 +30,7 @@
 | **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores (`src/vision/`) |
 | **HACK-018** | S4 | P1 | `AVAILABLE` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/`) |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
-| **HACK-020** | S4 | P0 | `AVAILABLE` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
+| **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
 
 ---
 
@@ -757,7 +757,7 @@
 
 #### Decisiones de diseño (corrigen el plan original)
 1. **Mismo arm slot que el dataset.** El dataset no mide el brazo: `src/features/physical.py:190` define `arm_slot_deg = atan2(RelHeight − 4.0, |RelSide| + 0.5)` a partir del punto de soltura. VeloVision estima el **punto de soltura relativo** (altura y lado de la muñeca respecto al pie de apoyo, escalados por la estatura) y aplica **esa misma fórmula** (`arm_slot_dataset_deg`). El ángulo hombro→muñeca (`arm_angle_biomech_deg`) se reporta aparte, solo como dato biomecánico, y **no** se usa para filtrar el catálogo.
-2. **El error de medición se propaga.** La ventana de búsqueda de comparables es `±max(6°, 2·MAE_slot)`, donde `MAE_slot` sale de la validación (17-D). Mientras no exista validación se usa ±6° y la ficha lo marca como "error aún no medido".
+2. **El error de medición se propaga.** **(Actualizado 2026-10-21, decisión del usuario.)** La ventana de búsqueda de comparables es `±max(6°, error_combinado)`, con `error_combinado = sqrt(MAE_slot² + slot_sys_err²)` (`combined_slot_error_deg`). `MAE_slot` sale de la validación (17-D) y `slot_sys_err` es el error sistemático de origen, propagado por esquinas (~±14° típico). No se duplica porque `slot_sys_err` ya es una cota (desviación máxima), no una desviación estándar. Mientras no exista `MAE_slot`, la ficha lo marca como "error de medición aún no medido".
 3. **Rangos por familia de pitcheo**, no mezclados.
 4. **Calidad antes que respuesta.** Si la puntuación de calidad es baja (landmarks poco visibles, sujeto pequeño, cuerpo cortado o vista no frontal), la app **no** da rangos y explica qué falló y cómo regrabar.
 5. **Release con confirmación humana:** detección automática del frame de soltura más confirmación o corrección manual en una barra de frames.
@@ -774,7 +774,7 @@
 
 **17-B · Puente con el catálogo LMB** — `src/vision/prospect_card.py`, `tests/test_prospect_card.py`. No requiere videos.
 - `build_prospect_card(arm_slot_dataset_deg, throws, rel_height_ft=None, slot_error_deg=None, observed_velo_mph=None, min_pitchers=8) -> dict`:
-  - Filtra `reports/leaderboards/pitcher_arsenal_breakdown.csv` por la misma mano y por slot dentro de ±max(6°, 2·error). Si hay `observed_velo_mph`, filtra además por `fb_velo ± 1.5`.
+  - Filtra `reports/leaderboards/pitcher_arsenal_breakdown.csv` por la misma mano y por slot dentro de ±max(6°, error) (ver Decisión 2). Si hay `observed_velo_mph`, filtra además por `fb_velo ± 1.5`.
   - Por cada `pitch_id` devuelve: p10, p25, p50, p75 y p90 de `stuff_plus_cdmx` y de `delta_stuff_cdmx` (ponderados por `n_pitches`), `n_pitchers` y `n_pitches`.
   - Familias con menos de `min_pitchers` → `status = "INSUFFICIENT_PEERS"` y sin cifras.
   - Ordena las familias por mediana de Stuff+ CDMX ("con tu mecánica, estas familias aguantan mejor la altitud").
@@ -807,7 +807,7 @@
 #### Criterios de Aceptación
 1. `arm_slot_dataset_deg` aplica exactamente la fórmula de `src/features/physical.py:190` (test con keypoints sintéticos).
 2. La ficha da siempre rangos por familia (p25–p50–p75), nunca un valor puntual del prospecto. Las familias con menos de `min_pitchers` pitchers salen como `INSUFFICIENT_PEERS`.
-3. La ventana usa `±max(6°, 2·MAE_slot)` y la ficha dice si el error está medido o no.
+3. La ventana usa `±max(6°, error_combinado)` (Decisión 2) y la ficha muestra la ventana, si el error está medido o no y el % del catálogo que cubre.
 4. Con calidad baja no se emiten rangos y se muestra el diagnóstico.
 5. El efecto del radar sobre el ancho p25–p75 se **reporta** (antes/después); no se exige que siempre lo reduzca.
 6. Validación con N real, ICC entre anotadores y MAE visión–humano en `vision_validation_summary.csv`.
@@ -824,10 +824,105 @@
   - [ ] ¿La validación usa anotación manual de 2 personas con ICC y MAE reales, sin cruce con `pitcher_anon_id`?
   - [ ] ¿La puerta de calidad impide dar rangos con video malo?
 
+#### Revisión 17-A / 17-B
+*(Revisor independiente, 2026-10-21. El estado global de HACK-017 sigue `IN_PROGRESS` hasta 17-C y 17-D.)*
+
+**Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_vision_core.py tests/test_prospect_card.py` -> exit 0. Primera corrida: 32 passed, 1 skipped (falta el modelo `.task`). Después apareció `models/pose_landmarker_full.task` (9.4 MB, sin trackear y no ignorado en git; no es de 17-A/B) y la rama real de MediaPipe Tasks corrió: **33 passed, 0 skipped**. Alcance: 17-A y 17-B tocaron solo sus archivos (`src/vision/`, `tests/test_vision_core.py`, `tests/test_prospect_card.py`); el resto del working tree es de HACK-020 y del Orquestador.
+
+**17-A · Núcleo de visión: `CAMBIOS_REQUERIDOS`** (un solo cambio, de documentación y honestidad; el código es correcto)
+- **Cumple.** `_arm_slot_dataset` (`pose_slot.py:330-333`) es idéntica a `src/features/physical.py:190-191` (`atan2(RelHeight-4.0, |RelSide|+0.5)` en grados, recortada a [0,90]); `arm_angle_biomech_deg` (`:436-437`) va aparte y no filtra. Heurística de release y calidad documentadas (`:46-52`) y razonables. Falta de `.task` -> `PoseModelUnavailable` clara (`:204-209`, con test). Colores navy/teal, sin `#CE1126` (`:88-89`, con test). Sin afirmaciones de spin/quiebre/velocidad. La rama Tasks es correcta: `VisionTaskRunningMode.IMAGE`, `mp.Image(SRGB)`, `PoseLandmarker.create_from_options` existen en mediapipe 1.1.1, y se ejecutó con el modelo real.
+- **CRÍTICO, definición del slot: la fórmula es idéntica, pero los insumos NO tienen el mismo origen que `RelHeight`/`RelSide`.**
+  - **Altura** (`pose_slot.py:431`): `rel_height_ft = (y_tobillo_de_apoyo − y_muñeca)·ft_per_px`, es decir, altura de la **muñeca sobre el tobillo del pie de apoyo**. `RelHeight` de TrackMan es la altura del **punto de suelta (la pelota) sobre el nivel del campo/plato**, que incluye el montículo. Tres diferencias: (i) el tobillo está ~0.3 ft sobre la suela; (ii) el pie de apoyo pisa la pendiente del montículo, que está ~0.5-0.8 ft sobre el plato; (iii) la pelota sale por encima de la muñeca. Los efectos (i) y (ii) hacen que el video subestime `RelHeight` en el orden de 0.8-1 ft y (iii) lo compensa solo en parte; el neto no está medido. Si el video se grabó en piso plano o bullpen, (ii) desaparece y el sesgo cambia.
+  - **Lado** (`:432`): `rel_side_ft = (x_muñeca − x_centro_de_caderas)·signo`, es decir, distancia lateral al **centro de la cadera en ese frame**. `RelSide` de TrackMan es la distancia lateral al **centro de la goma/línea plato-goma**. Coinciden solo si la cadera cae sobre esa línea al soltar; el paso (stride) y la inclinación del tronco la desvían.
+  - **Por qué importa (cálculo):** con `rel_h=6.0, rel_s=1.5` el slot es 45.0°. Con 0.4 ft menos de altura es 38.7° (-6.3°); con 0.9 ft menos, 28.8° (-16°); con 0.5 ft más de lado, 38.7°. Un sesgo de 0.4 ft ya iguala el semiancho mínimo de la ventana (±6°) y es invisible para la validación 17-D si esta solo compara visión contra anotadores humanos, porque ambos miden en el mismo video y comparten el sesgo respecto de TrackMan. Es el riesgo central del producto.
+  - **Falta (obligatorio):** (a) documentar en el docstring del módulo (`:35-41`) y en `_arm_slot_dataset` que `rel_height_ft`/`rel_side_ft` son *proxies* con origen distinto al de TrackMan (ankle-referenced, hip-referenced), listando los tres sesgos de altura y el de lado; hoy la línea `:40` dice "formula EXACTA" y el comentario `:331` dice "Misma formula", sin aclarar que la igualdad es de fórmula y no de insumos; (b) exponer en `measure_release` el supuesto (p. ej. una clave `origin_note` o `assumptions`) para que 17-C y el Documento Técnico lo citen; (c) la validación 17-D debe reportar este sesgo como límite no medido (no hay emparejamiento con TrackMan permitido por AGENTS.md §2 puntos 5-6) y el rango debe seguir ampliándose por el error medido. No se pide un factor de corrección inventado.
+- **Observación sobre `0.93` (`:30-34`, `:71`):** queda documentado como fracción antropométrica (nariz ≈ 0.93 de la estatura), pero está redactado como hecho y no como supuesto. Reescribir como "supuesto: ..." y anotar que no se calibró con datos propios. Además usa el percentil 80 de la distancia nariz-tobillo (`:413`), que supone al lanzador casi erguido en parte del clip.
+- **Observaciones menores, no bloqueantes:** (1) `pose_slot.py:424`: si el tobillo de apoyo es menos visible, cae silenciosamente al tobillo del lado lanzador (pie trasero, levantado al soltar) y sobrestima `rel_height_ft`; conviene añadir un issue de calidad en ese caso. (2) `:391-395`: la rotación de tronco al soltar puede acercar los hombros y disparar "vista de perfil" (x0.85) en tomas frontales válidas; probar con video real en 17-D. (3) `_make_detector` (`:194`, `:217`) no cierra `Pose`/`PoseLandmarker`; con muchos clips seguidos en Streamlit puede acumular recursos. (4) `:54-56` afirma que la medición/detección es "del orden de milisegundos por clip" y solo existe el test que mide la parte NumPy (<5 ms/frame); el criterio 8 (clip de 5 s en < 30 s con MediaPipe) sigue sin medirse y debe medirse en 17-D/17-C con el modelo ya presente.
+
+**17-B · Puente con el catálogo LMB: `APROBADA`**
+- Filtra por `arm_slot_deg` del catálogo, que es la definición del dataset (`prospect_card.py:82`; el CSV lo exporta HACK-014), no por el ángulo biomecánico. Ventana `max(6, 2·error)` (`:136`; error 5° -> 10.0, sin error -> 6.0). `error_source` correcto: "medido" si hay `slot_error_deg`, si no "aún no medido" (`:157`). Filtros opcionales de `RelHeight ±0.5` y `fb_velo ±1.5` solo si se pasan (`:83-86`).
+- Rangos por `pitch_id`, p10/p25/p50/p75/p90 de `stuff_plus_cdmx` y `delta_stuff_cdmx` ponderados por `n_pitches` (`:50-66`, `:90-96`). **Recalculado a mano** sobre el CSV real (Right, slot 40°, ventana 10°, Slider, 413 pitchers, 581 filas): p25 = 106.0004, p50 = 110.0510, idénticos a la salida de la función. `n_pitchers` usa `nunique` de `pitcher_anon_id` y `n_pitches` suma.
+- `INSUFFICIENT_PEERS` (`:107-108`) sale sin ninguna cifra de Stuff+ y se ordena al final (`:115-117`); las familias con cifras se ordenan por mediana descendente.
+- Nunca devuelve un valor puntual del prospecto ni ningún `pitcher_anon_id` (la clave solo se usa para contar; el test `test_no_point_value_or_pitcher_id` lo verifica). `disclaimer` literal idéntico al de la especificación (`:21-24`, con test). Sin cifras hardcodeadas.
+- **Observaciones no bloqueantes:** (1) `:136` acepta `slot_error_deg` negativo o NaN y produciría ventana 6 o NaN con `error_source = "medido"`; validar `>= 0` y finito. (2) `arm_slot_dataset_deg` NaN produce 0 comparables sin error explícito; 17-C debe impedir llamar sin medición válida (puerta de calidad). (3) `velo_narrowing_report` es una función extra no pedida por la interfaz, aunque útil para el criterio 5 y dentro de su archivo. (4) La nota de que `arm_slot_deg` del catálogo sale de `RelHeight`/`RelSide` de TrackMan y que el video usa proxies de otro origen debe llegar al usuario final; es el punto (a) de 17-A.
+
+#### Re-revisión 17-A (corrección de orígenes)
+*(Revisor independiente, 2026-10-21. No cambia el estado global de HACK-017, que sigue `IN_PROGRESS` hasta 17-C y 17-D.)*
+
+**Veredicto 17-A: `APROBADA`.** Los cuatro puntos obligatorios y los cinco menores de la revisión anterior quedan resueltos; no hay bloqueos.
+
+**Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_vision_core.py tests/test_prospect_card.py` -> **42 passed, exit 0**. Alcance: `git diff` contra 48d143d toca solo `src/vision/__init__.py` (+2: exporta `combined_slot_error_deg`), `src/vision/pose_slot.py` y `tests/test_vision_core.py`. Los cambios en `dashboard/` son de 17-C y no se revisaron aquí.
+
+**Puntos obligatorios**
+1. **Altura:** `pose_slot.py:540-541` = (y_tobillo_apoyo − y_muñeca)·ft_per_px + `ANKLE_TO_SOLE_FT` + `MOUND_HEIGHT_FT` + `HAND_TO_BALL_FT`. Cumple (suela, montículo, mano-pelota).
+2. **Lado:** `:521-529` usa la mediana de x del pie de apoyo en los primeros `START_FRAMES` con visibilidad >= `VIS_MIN`; respaldo en centro de cadera con aviso en `issues` y en `origin_notes` (`:530-537`); signo por hombros (`:539`). Cumple.
+3. **Error sistemático:** `rel_height_sys_err_ft`/`rel_side_sys_err_ft` en `out` (`:438`), `slot_sys_err_deg` por esquinas (`_slot_sys_err`, `:398-403`, asignado en `:546`), `origin_notes` (`:440`, `:538`), `combined_slot_error_deg` hipotenusa con `mae=None -> 0` (`:406-409`).
+   **Recálculo a mano** para rel_h=5.68, rel_s=1.5, err ±0.4/±0.5: slot central 40.03°; esquinas (h-, s-) +0.44°, (h-, s+) -12.92°, (h+, s-) **+14.17°**, (h+, s+) -0.27°. Máximo = **14.17°**, y la función devuelve 14.172. El "~14°" es correcto. Con MAE 5° el combinado es 15.03°.
+4. **Honestidad:** `:30-33` y `:392-393`: igualdad "de FORMULA", insumos aproximados. `:63-66`: el 0.93 es SUPUESTO no calibrado. `:82-86`: tiempo medido con fecha; lo reproduje: extracción de 150 frames = 5.7 s (documentado 5.8 s). Cumple.
+
+**Menores:** (a) tobillo de apoyo ya no se sustituye: `:513-518` baja calidad a <= 0.5 y avisa (`test_hidden_support_ankle_lowers_quality_and_warns`); (b) perfil con mediana de los primeros frames, `:469-483` (test `test_profile_view_uses_start_of_delivery_not_release_frame`); (c) detector cerrado en `finally`, `:324-327`, con `_Detector.close()` idempotente (`:225-243`, test `test_detector_is_closed`). Cumple.
+
+**Compatibilidad:** `measure_release` conserva `frame_idx, throws, height_ft, rel_height_ft, rel_side_ft, arm_slot_dataset_deg, arm_angle_biomech_deg, ft_per_px, quality_score, quality_issues, quality_ok` (comparado con 48d143d `:355-357`) y solo añade `rel_height_sys_err_ft, rel_side_sys_err_ft, slot_sys_err_deg, origin_notes`. Sin rupturas para 17-C.
+
+**Constantes** (`pose_slot.py:101-106`): `MOUND_HEIGHT_FT = 10/12` citada como REGLA; `ANKLE_TO_SOLE_FT` y `HAND_TO_BALL_FT` con valor, rango y "SUPUESTO no calibrado" (`:45-49`); `REL_*_SYS_ERR_FT` y `ANTHROPOMETRIC_NOSE_FRACTION` marcadas SUPUESTO / no calibrado. No hay cifra presentada como hecho sin respaldo.
+
+**Observaciones no bloqueantes**
+- `:39-41` cita "reglas 2.01 y 5.01"; el diagrama de la plancha (10 in) está en la 2.01 (diagrama del campo); la 5.01 trata del inicio del juego y puede sobrar. Además "la LMB juega con reglas oficiales" es una afirmación sin fuente en el repo; conviene decir "supuesto".
+- `:57-62` y `:105-106`: los 0.4/0.5 ft no llevan rango ni la etiqueta literal "no calibrado" (sí "SUPUESTO"); y el error de escala (0.93, +-3 % de la estatura, ~0.05 ft en la altura) no entra en `slot_sys_err_deg`: es pequeño, pero no está declarado.
+- `:522-523`: el origen lateral supone que el clip incluye el inicio de la entrega antes de la zancada del pie de apoyo; si el clip arranca tarde, el origen se desplaza sin aviso (solo el respaldo por falta de visibilidad avisa). 17-C debería pedir que el clip incluya el inicio.
+- El error sistemático sigue sin validarse contra TrackMan (AGENTS.md §2.6 lo impide); 17-D debe reportarlo como límite no medido.
+
+**Riesgo de producto (observación, no bloqueo):** con ~14° de error sistemático típico (y 15° con MAE 5°) la regla de 17-B `max(6, 2·error)` da una ventana de ~±28°. En el catálogo real (`reports/leaderboards/pitcher_arsenal_breakdown.csv`, 5447 filas, `arm_slot_deg` media 39.2, sd 12.8), la ventana ±28° alrededor de 40° (12-68°) contiene el **95.8 %** de las filas, frente a 38.7 % con ±6°. La ficha pasaría a ser casi "toda la liga": rangos por familia casi idénticos entre prospectos y poco informativos. Opciones para el Orquestador: (1) presentar el rango como "Mismo orden de magnitud que la liga; el slot discrimina poco" y mostrar `n_pitchers` y el % del catálogo cubierto; (2) usar `2·error` solo para el error aleatorio (MAE) y mostrar aparte un análisis de sensibilidad con el sesgo sistemático (rango en el slot central y en los extremos de las esquinas), en vez de ensanchar a ciegas; (3) reducir el error sistemático antes con un video de bullpen con marcas conocidas (17-D). Es una decisión de producto, no un defecto de 17-A.
+
+#### Revisión 17-C
+*(Revisor independiente, 2026-10-21. No cambia el estado global de HACK-017, que sigue `IN_PROGRESS` hasta 17-D.)*
+
+**Veredicto 17-C: `CAMBIOS_REQUERIDOS`** (dos cambios obligatorios, ambos pequeños; el resto cumple).
+
+**Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_velovision_ui.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_vision_core.py tests/test_prospect_card.py` -> **99 passed, exit 0** (27.8 s). Rendimiento medido por `test_dashboard_smoke` con las 6 pestañas: carga en frío 2.49 s (límite 20 s), Simulador en caliente 0.58 s / 0.84 s con SHAP y figuras (límite 3 s), re-render completo de `app.py` 0.20 s.
+
+**Cambios obligatorios**
+1. **Etiqueta engañosa del error (confirma el hallazgo (a) del Orquestador).** `dashboard/velovision_tab.py:232` pasa `combined_slot_error_deg(None, sys_err)`, es decir, solo el error SISTEMÁTICO supuesto, y `src/vision/prospect_card.py:148` y `:169` marcan `error_source = "medido"` siempre que reciben un número. `velovision_tab.py:310` lo imprime como "Error del slot: **medido** (error_source)". Contradice la Decisión 2 y el criterio 3 (el MAE contra anotadores no existe hasta 17-D). Corrección exacta:
+   - (i) En `prospect_card.py:123-170` añadir un parámetro opcional `slot_error_kind: str | None = None` y devolver `error_source = slot_error_kind or ("medido" if has_error else "aún no medido")`. Valores: `"sistemático supuesto"`, `"medido (MAE de validación)"`, `"combinado (MAE + sistemático)"`. Es compatible con los tests de 17-B porque el comportamiento por defecto no cambia (sí toca un archivo ya aprobado: el Orquestador debe autorizarlo).
+   - (ii) En `velovision_tab.py:226-232` decidir el tipo en `slot_error_for` (devolver `(err, kind)`: `"sistemático supuesto"` mientras `mae is None`; `"combinado (MAE + sistemático)"` cuando 17-D aporte el MAE) y pasarlo a `_card` (`:209`).
+   - (iii) `:310` debe imprimir ese texto en español, sin el sufijo "(error_source)".
+   - Alternativa solo-UI, si no se quiere tocar 17-B: no imprimir `card["error_source"]` y mostrar "Error del slot: sistemático supuesto ±X° (MAE contra anotadores: aún no medido)".
+   - La nota de `:326-327` ya es correcta y debe quedar. Ajustar `tests/test_velovision_ui.py:121` (hoy exige el literal `error_source`) para exigir "sistemático supuesto" y que NO aparezca "medido (error_source)".
+2. **`clip_id` sí admite nombres.** `dashboard/annotation_tab.py:28` (`^[A-Za-z0-9_-]{1,24}$`) acepta `Juan` y `Pedro_Lopez` (verificado: `build_rows` devuelve 6 filas). Solo rechaza espacios, acentos y símbolos, así que `test_annotation_rejects_names_as_clip_id` (`tests/test_velovision_ui.py:220`, caso `"Juan Pérez"`) pasa por casualidad. Corrección: `CLIP_ID_RE = re.compile(r"^C\d{3,5}$")` (el formato que genera `next_clip_code`), mensajes de `:48` y de `:194` coherentes ("formato C001") y añadir `"Juan"`, `"Pedro_Lopez"` y `"Maria"` a la parametrización de `:220`. Ese CSV puede subirse al repo como evidencia, así que la privacidad debe quedar garantizada por formato y no por buena fe.
+
+**Cumple (verificado)**
+- **Alcance y `apply_velovision_override`:** `git diff` toca solo los archivos permitidos más `docs/TASKS.md` y `.gitignore` (+`*.mp4 *.mov *.avi`; ningún video está versionado; es justificable por privacidad, pero está fuera de `AllowedPaths`: que el Orquestador lo avale). El override de `app.py:553` va más allá de "solo registrar", pero está justificado: el Simulador reescribe `active_pitch_params` en cada ejecución (`app.py:468`) y sin él el botón "Buscar referencias factibles" nunca llegaría al Sculptor. Probado con `AppTest` sobre `dashboard/app.py` completo: tras cargar el override y re-ejecutar, `active_pitch_params.arm_slot_deg` queda en 55 (el del prospecto) sin excepciones; al mover el slider `in_arm_slot` a 45 el override se suelta (`vv_override = None`, slot 45) y `last_sim_results` vuelve a traer `stuff_cdmx`. El override solo quita `stuff_cdmx` de `last_sim_results` mientras está activo y el Simulador lo reescribe completo en la siguiente ejecución, así que no lo borra de forma persistente ni rompe el Mapa (que se pinta antes). Consecuencia deseada: el Sculptor no recibe el Stuff+ del Simulador como si fuera del prospecto.
+- **Criterio 2:** `family_ranges` con barras p25-p75 y mediana por familia; no existe valor puntual del prospecto; `INSUFFICIENT_PEERS` se atenúa y no trae cifras. Nota explícita "no es un valor del prospecto" (`:323-324`).
+- **Criterio 3:** la ficha muestra ventana (`:308`), cobertura % (`:304-309`) y fuente del error (`:310`, pendiente del cambio 1). Observación menor: con radar activo `n_pitchers_total` ya incluye el filtro de velocidad, así que "% de los pitchers de esa mano" mezcla ambos filtros; añadir "(con filtro de radar)" cuando `velo` no sea `None`.
+- **Criterio 4:** puerta de calidad (`:429-432`, `:366-374`): sin rangos y con diagnóstico; probado (`test_low_quality_blocks_ranges_and_shows_issues`). Además exige confirmar la soltura (`:433`).
+- **Criterio 5:** tabla antes/después del radar (`:333-338`, `narrowing_table`) con la nota "el radar no siempre lo reduce".
+- **Criterio 7:** ningún texto de la UI menciona `pitcher_anon_id` (solo docstring y la lectura del catálogo para contar); el badge literal niega medir spin/quiebre/velocidad y el radar "lo ingresas tú: el video no la mide" (`:259`). Los tests con patrones prohibidos pasan.
+- **Privacidad:** temporal borrado en `finally` (`:143-145`), caché solo por sesión (`st.session_state`, 2 secuencias) y la UI lo declara (`:49-50`, `:386`).
+- **Modo anotación (probado de punta a punta con `AppTest`, sustituyendo `streamlit_image_coordinates` por un stub que devuelve clics):** 6 clics habilitan "Guardar"; deshacer quita el punto y lo deshabilita; vuelto a 6 se guarda. El CSV tiene exactamente `clip_id, frame_idx, annotator, landmark, x, y, throws, height_ft, timestamp` (superconjunto de lo pedido), coordenadas normalizadas 0-1 (x/ancho, y/alto) y orden nariz, hombro, codo, muñeca, cadera, tobillo_apoyo. El anotador B sobre el mismo clip da 12 filas y `A: 1, B: 1, ambos: 1`; re-guardar reemplaza y no duplica. El guard `an_last_click` evita que el valor persistente del componente reañada puntos tras deshacer o guardar. **No** se probó el componente real en un navegador (el stub reemplaza el JS); la lógica x/width, y/height es correcta si el componente devuelve el tamaño mostrado, que es su contrato.
+- **Visual (capturas `vv_01_vacio`, `vv_02_ficha`, `vv_03_anotacion`):** coherente con HACK-019 (superficies blancas, navy para datos, teal/coral para delta, sin texto encimado, íconos de línea). Todo en español salvo las excepciones de abajo. **(c) Botón primario rojo:** consistente; `.streamlit/config.toml` y `theme.py:245` reservan el rojo de marca para pestaña activa, preset y botón primario, y los tres primarios nuevos (Confirmar soltura, Buscar referencias factibles, Guardar anotación) lo usan igual que el Simulador. Los datos (barras, puntos de anotación) no usan rojo.
+
+**Observaciones no bloqueantes**
+- **(b) `st.file_uploader` en inglés** ("Upload", "200MB per file", visibles en `vv_01_vacio.png`): Streamlit 1.66 no ofrece parámetro para traducirlos. Se pueden tapar con CSS en `dashboard/theme.py` (`[data-testid="stFileUploaderDropzoneInstructions"] span{display:none}` más un `::before{content:"Arrastra el video aquí · MP4 o MOV"}`, y el botón con `font-size:0` más `::after{content:"Subir video"}`; verificar los `data-testid` en 1.66). Lo más grave no es el idioma sino que "200MB per file" contradice el límite de 60 MB de la app (`MAX_UPLOAD_MB`, `velovision_tab.py:31`): fijar `[server] maxUploadSize = 60` en `.streamlit/config.toml` (fuera de `AllowedPaths` de 17-C; requiere visto bueno del Orquestador). Aceptable para el hackathon solo si se documenta; recomendado arreglarlo con el CSS y el `maxUploadSize`.
+- Identificadores técnicos en la UI: `velovision_tab.py:308` imprime "(window_deg)" y `:310` "(error_source)". Quitarlos ("Ventana de búsqueda ±X°"); ajustar `tests/test_velovision_ui.py:121`.
+- `annotation_tab.py`: el código por defecto sale de `next_clip_code`, que depende de las sesiones; si A y B anotan el mismo video en sesiones distintas pueden terminar con códigos distintos y "ambos" no los empareja. Indicar en la UI "usa el mismo código para ambos anotadores" o derivarlo del hash del clip.
+- `.claude/` aparece sin trackear (configuración local); no debe entrar al commit.
+
+**Re-revisión 17-C: `APROBADA`** *(Revisor independiente, 2026-10-21. No cambia el estado global de HACK-017, que sigue `IN_PROGRESS` hasta 17-D.)*
+
+**Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_velovision_ui.py tests/test_prospect_card.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_vision_core.py` -> **107 passed, exit 0** (28.5 s). Rendimiento: carga en frío del Simulador sin regresión, en caliente 0.56 s (0.85 s con SHAP y figuras; límite 3 s), re-render completo 0.21 s.
+
+- **Cambio 1 (etiqueta del error): resuelto.** `prospect_card.py` añade `slot_error_kind` (`:131`, propagado en `velo_narrowing_report`) y `error_source = slot_error_kind or (...)` (`:172`); sin el parámetro el comportamiento de 17-B no cambia. `velovision_tab.py:226-237` devuelve `(error, tipo)` con `KIND_SYS` mientras no haya MAE y `KIND_BOTH` cuando 17-D lo aporte. La ficha (`:310-312`, captura `vv_02_ficha.png`) dice "Error del slot: sistemático supuesto ±11.6° · error de medición aún no medido"; ya no aparecen "medido (error_source)" ni "(window_deg)".
+- **Cambio 2 (`clip_id`): resuelto.** `annotation_tab.py:28` = `^C\d{3,5}$`; "Juan", "Pedro_Lopez" y "Maria" ya no pasan y el test los rechaza. El campo del código es de solo lectura (`:178-180`), así que un nombre no se puede escribir.
+- **Registro de clips (`annotation_tab.py:88-105`): correcto.** El mismo hash da el mismo `C###` en cualquier sesión (A y B coinciden), el siguiente código sale de registro y anotaciones, y solo guarda `clip_code` y un hash corto de 16 caracteres (sin nombre de archivo ni datos personales). Los tests no dejan el CSV real creado. Observación menor: el registro se escribe al elegir un clip, aunque luego no se anote; es inocuo.
+- **Uploader y `maxUploadSize = 60`: resuelto.** `.streamlit/config.toml` fija 60 MB, coherente con `MAX_UPLOAD_MB`. El CSS de `theme.py` (selectores `stFileUploaderDropzoneInstructions` y `stFileUploaderDropzone button`) es global, pero `pick_clip` es el único `st.file_uploader` de toda la app (VeloVision y Modo anotación, ambos con la misma intención), así que no afecta al Simulador, Mapa, Leaderboard ni Sculptor. La captura `vv_01_vacio.png` muestra "Subir video" y "máx. 60 MB · MP4, MOV" sin texto encimado. Riesgo conocido, no bloqueante: depende de los `data-testid` de Streamlit 1.66; si se actualiza la versión, el texto en inglés podría reaparecer (degradación visual, no funcional).
+- **Cambio 5 (cobertura con radar): resuelto.** `:307-308` añade "(incluye el filtro de radar)" cuando hay lectura de radar.
+- **Alcance:** `.streamlit/config.toml`, `prospect_card.py`, `tests/test_prospect_card.py` y `.gitignore` quedan cubiertos por la ampliación del Orquestador. Sigue sin trackear `.claude/`, que no debe entrar al commit.
+
+
 ---
 
 ### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
-- **State:** `AVAILABLE`
+- **State:** `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
 - **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
 - **AllowedPaths:** `requirements.txt`, `runtime.txt` o `.python-version`, `.streamlit/config.toml`, `packages.txt` (dependencias de sistema si OpenCV o MediaPipe las piden), `README.md` (sección "Cómo usar la app"), `docs/DEPLOY.md`.
 - **Especificación:**
@@ -846,6 +941,22 @@
 - **Reviewer Checklist:**
   - [ ] ¿Las versiones fijadas coinciden con las probadas localmente?
   - [ ] ¿El despliegue excluye `data/` y cualquier archivo pitch-by-pitch?
+
+#### Revisión de la preparación (APROBADA, despliegue pendiente del usuario)
+Revisor independiente, 2026-10-21. El estado no pasa a `APPROVED` hasta registrar URL pública y prueba de humo en `docs/DEPLOY.md`.
+- **Verify real:** `.venv\Scripts\python.exe -m pytest -q tests/test_dashboard_smoke.py` -> `16 passed in 15.85s`, exit 0.
+- **Alcance:** los archivos de HACK-020 son `requirements.txt`, `requirements-dev.txt`, `packages.txt` y `docs/DEPLOY.md`. `src/vision/` y sus tests son de HACK-017 y no forman parte de esta revisión.
+- **Versiones:** las 10 versiones de `requirements.txt` coinciden con `pip freeze` (streamlit 1.66.0, sklearn 1.9.1, lightgbm 4.7.0). Los 4 `models/*.joblib` cargan con `-W error::UserWarning`.
+- **Imports:** ningún import de `dashboard/` ni `src/` usa shap, xgboost, catboost, econml, matplotlib, seaborn, kaleido, fastapi ni uvicorn. El SHAP del simulador usa `booster_.predict(pred_contrib=True)` (`src/models/stuff.py:942`), no el paquete `shap`. Lo movido a `requirements-dev.txt` no lo usa la app.
+- **Linux (PyPI):** hay wheel manylinux x86_64 para mediapipe 1.1.1 (`py3-none-manylinux_2_28`), opencv-python-headless 5.0.0.93 (`cp37-abi3`), numpy, scipy, pandas, pyarrow, sklearn (cp312) y lightgbm. `opencv-contrib-python` (dependencia de mediapipe) y la variante headless comparten versión 5.0.0.93 y ambos escriben `cv2/`; gana el último en instalarse. La API es equivalente, así que el riesgo es bajo; si falla `libGL.so.1`, `packages.txt` (`libgl1`, `libglib2.0-0`, `libportaudio2`) lo cubre.
+- **Contenido:** `git ls-files` tiene 90 archivos, ningún `data/`, parquet, video ni modelo `.task`; `.git` pesa 5.7 MB y el árbol versionado ~12 MB. Los grep de `PitchUID` solo aparecen en código y docs, no en filas de datos.
+- **DEPLOY.md:** repo, rama `main`, `dashboard/app.py` y Python 3.12 en Advanced settings son correctos y suficientes. El plan B de Hugging Face Spaces es viable.
+- **Observaciones no bloqueantes:**
+  1. `streamlit-image-coordinates==0.4.1` está fijado por la especificación, pero ningún archivo de `dashboard/` ni `src/` lo importa. Se puede quitar si no se usa.
+  2. `.gitignore` excluye `data/` y `*.parquet` pero no los videos. Conviene añadir `*.mp4`/`*.mov` para evitar subir clips por accidente.
+  3. Antes del despliegue final, VeloVision (HACK-017) necesita el modelo `.task` de MediaPipe versionado en el repo (mediapipe 1.1.1 ya no trae `mp.solutions`; `src/vision/pose_slot.py` lo pide). Sin él, la pestaña falla en la nube.
+  4. Los archivos de HACK-020 y `src/vision/` siguen sin commit. El usuario debe hacer push a `main` antes de desplegar.
+  5. No se probó en Linux; solo se verificaron los wheels en PyPI.
 
 
 ### `HACK-018` — Integración Final del Dashboard, Perfil Ideal, 3 Casos de Entrevista y Paper Técnico (`docs/`)

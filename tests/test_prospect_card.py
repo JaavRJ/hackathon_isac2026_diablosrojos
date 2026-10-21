@@ -80,10 +80,21 @@ def test_window_widens_with_error():
     a = build_prospect_card(35, "Right", catalog=df)
     b = build_prospect_card(35, "Right", slot_error_deg=2.0, catalog=df)
     c = build_prospect_card(35, "Right", slot_error_deg=5.0, catalog=df)
-    assert a["window_deg"] == 6.0 and b["window_deg"] == 6.0 and c["window_deg"] == 10.0
-    assert c["n_pitchers_total"] == 13  # 'far' (50 deg) aun fuera con ventana 10
-    d = build_prospect_card(35, "Right", slot_error_deg=8.0, catalog=df)  # 16 deg -> 'far' dentro
-    assert d["n_pitchers_total"] == 14
+    assert a["window_deg"] == 6.0 and b["window_deg"] == 6.0 and c["window_deg"] == 6.0
+    e = build_prospect_card(35, "Right", slot_error_deg=14.0, catalog=df)
+    assert e["window_deg"] == 14.0
+    assert e["n_pitchers_total"] == 13  # 'far' (15 deg de distancia) aun fuera
+    d = build_prospect_card(35, "Right", slot_error_deg=16.0, catalog=df)
+    assert d["window_deg"] == 16.0 and d["n_pitchers_total"] == 14
+
+
+def test_invalid_error_and_nan_slot():
+    df = _synthetic()
+    for bad in (-3.0, float("nan")):
+        c = build_prospect_card(35, "Right", slot_error_deg=bad, catalog=df)
+        assert c["error_source"] == "aún no medido" and c["window_deg"] == 6.0
+    with pytest.raises(ValueError):
+        build_prospect_card(float("nan"), "Right", catalog=df)
 
 
 def test_insufficient_peers():
@@ -130,6 +141,16 @@ def test_error_source():
     df = _synthetic()
     assert build_prospect_card(35, "Right", catalog=df)["error_source"] == "aún no medido"
     assert build_prospect_card(35, "Right", slot_error_deg=3.0, catalog=df)["error_source"] == "medido"
+
+
+def test_slot_error_kind_overrides_label_only():
+    df = _synthetic()
+    base = build_prospect_card(35, "Right", slot_error_deg=9.0, catalog=df)
+    for kind in ("sistemático supuesto", "medido (MAE de validación)", "combinado (MAE + sistemático)"):
+        c = build_prospect_card(35, "Right", slot_error_deg=9.0, catalog=df, slot_error_kind=kind)
+        assert c["error_source"] == kind
+        assert c["window_deg"] == base["window_deg"] and c["families"] == base["families"]
+    assert build_prospect_card(35, "Right", catalog=df, slot_error_kind=None)["error_source"] == "aún no medido"
 
 
 def test_catalog_path_and_missing_columns(tmp_path):

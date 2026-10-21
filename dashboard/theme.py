@@ -443,6 +443,55 @@ table.dr-tbl td small{white-space:nowrap}
 [data-testid="stCheckbox"][data-selected="true"] label > span + div{background:var(--navy) !important;border-color:var(--navy) !important}
 h1,h2,h3,h4,[data-testid="stMarkdownContainer"] h3{color:var(--text) !important}
 
+/* ---- VeloVision ---- */
+.dr-disclaimer{display:flex;gap:.6rem;align-items:center;border:1px solid var(--line);background:var(--soft);border-radius:99px;
+  padding:.4rem 1rem;font-size:.8rem;font-weight:600;color:var(--text)}
+.dr-disclaimer .ic{color:var(--navy);flex:none}
+.dr-guides{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:.8rem}
+.dr-guide{display:flex;gap:.7rem;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:.8rem 1rem;box-shadow:var(--sh);color:var(--text);font-size:.85rem}
+.dr-guide-ic{width:2.6rem;height:2.6rem;border-radius:14px;background:var(--soft);color:var(--navy);display:grid;place-items:center;flex:none}
+.dr-guide-ic .ic{width:1.5rem;height:1.5rem}
+.dr-fstrip{position:relative;height:.9rem;margin:.2rem .4rem .5rem;background:#E7EAEF;border-radius:99px}
+.dr-fstrip i{position:absolute;top:-.25rem;bottom:-.25rem;width:4px;margin-left:-2px;border-radius:2px}
+.dr-fstrip i.cand{background:rgba(31,58,95,.35)} .dr-fstrip i.sug{background:rgba(11,122,102,.6);width:6px}
+.dr-fstrip i.conf{background:var(--gain);width:6px;top:-.5rem;bottom:-.5rem}
+.dr-fstrip u{position:absolute;top:-.3rem;width:1.1rem;height:1.1rem;margin-left:-.55rem;border-radius:50%;background:#fff;
+  border:3px solid var(--navy);box-shadow:0 2px 5px rgba(0,0,0,.25);pointer-events:none}
+.dr-fstrip + .dr-zleg i{width:.8rem;height:.8rem;border-radius:3px}
+.dr-measure .v{font-size:2.6rem;font-weight:800;line-height:1.1;color:var(--text)}
+.dr-measure .v small{font-size:.4em}
+.dr-fams{display:flex;flex-direction:column;gap:.35rem}
+.dr-fam{display:grid;grid-template-columns:6.5rem 1fr 7.5rem 5.5rem 5rem;gap:.6rem;align-items:center;font-size:.9rem;color:var(--text);
+  padding:.4rem .2rem;border-bottom:1px solid var(--line)}
+.dr-fam.dim{grid-template-columns:6.5rem 1fr;opacity:.55;border-bottom:1px dashed var(--line)}
+.dr-fam .nm{font-weight:800}
+.dr-frange{position:relative;height:.9rem;background:var(--soft);border-radius:4px;display:block}
+.dr-frange b{position:absolute;top:0;bottom:0;border-radius:4px}
+.dr-frange b.wide{background:rgba(62,92,122,.25)} .dr-frange b.iqr{background:var(--lvl-cdmx);top:.15rem;bottom:.15rem}
+.dr-frange i{position:absolute;top:-.2rem;bottom:-.2rem;width:3px;margin-left:-1.5px;background:var(--navy);border-radius:2px}
+.dr-fam .rng{font-weight:800}
+.dr-empty{display:flex;flex-direction:column;align-items:center;gap:.5rem;text-align:center;color:var(--muted);padding:2.2rem 1rem;
+  background:var(--card);border:1px dashed #C9CFD8;border-radius:var(--r)}
+.dr-empty .ic{width:2.6rem;height:2.6rem;color:var(--navy)}
+.dr-empty h4{font-size:1.15rem;font-weight:800;color:var(--text) !important;margin:0}
+.dr-empty p{max-width:34rem;margin:0}
+.dr-ok{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;color:var(--gain);background:var(--gain-bg);
+  border-radius:99px;padding:.25rem .8rem}
+.dr-ok .ic{width:1rem;height:1rem}
+.dr-stats{display:flex;gap:.6rem;flex-wrap:wrap;margin:.3rem 0 .6rem}
+.dr-stat{background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:.4rem .8rem;font-size:.8rem;color:var(--text)}
+.dr-stat b{font-weight:800}
+.dr-ann-step{display:flex;gap:.4rem;flex-wrap:wrap}
+.dr-ann-step span{font-size:.75rem;font-weight:700;border:1px solid var(--line);border-radius:99px;padding:.2rem .7rem;color:var(--muted);background:var(--soft)}
+.dr-ann-step span.done{color:var(--gain);background:var(--gain-bg);border-color:transparent}
+.dr-ann-step span.now{color:#fff;background:var(--navy);border-color:var(--navy)}
+/* uploader en español (Streamlit no traduce 'Upload' ni 'per file') */
+[data-testid="stFileUploaderDropzoneInstructions"] > div > span,[data-testid="stFileUploaderDropzoneInstructions"] small{display:none}
+[data-testid="stFileUploaderDropzoneInstructions"] > div::before{content:"máx. 60 MB · MP4, MOV";font-size:.85rem;color:var(--muted)}
+[data-testid="stFileUploaderDropzone"] button{font-size:0 !important}
+[data-testid="stFileUploaderDropzone"] button::after{content:"Subir video";font-size:.875rem;font-weight:600;color:var(--text)}
+
 /* ---- widgets nativos: neutralizar el primario (rojo = solo marca) ---- */
 [data-testid="stSlider"] [data-orientation="horizontal"][style*="relative"] > div:first-child{
   background:#DDE1E7 !important;height:.45rem !important;border-radius:99px !important}

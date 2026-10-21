@@ -9,7 +9,7 @@ relativas a la raiz); la logica pura vive en ``dashboard/ui_utils.py``, el siste
 ``dashboard/theme.py`` y los componentes en ``dashboard/components.py``.
 
 Vistas: (1) Simulador Nivel del Mar vs. Harp Helu, (2) Mapa de movimiento, (3) Leaderboard + tarjeta de
-lanzador, (4) Pitch Sculptor (modulo externo opcional), (5) VeloVision (en espera).
+lanzador, (4) Pitch Sculptor (modulo externo opcional), (5) VeloVision, (6) Modo anotación.
 
 Estado (``st.session_state``, segun docs/DISENO_UI_NIELSEN.md 3.3): ``active_pitch_params``,
 ``source_mode`` (PRESET | REAL_PITCHER | MANUAL_EDIT), ``loaded_pitcher_snapshot`` y ``last_sim_results``.
@@ -30,7 +30,9 @@ from dashboard import components as C
 from dashboard import theme
 from dashboard import ui_utils as ui
 
+from dashboard.annotation_tab import render_annotation_tab
 from dashboard.leaderboard_tab import render_leaderboard
+from dashboard.velovision_tab import apply_velovision_override, render_velovision_tab
 
 try:  # HACK-016 entrega este modulo en paralelo
     from dashboard.sculptor_tab import compute_sculptor, render_sculptor_result, render_sculptor_tab
@@ -535,22 +537,24 @@ def main() -> None:
     _init_state()
     render_header(meta)
 
-    tabs = st.tabs(["Simulador", "Mapa de movimiento", "Leaderboard", "Sculptor", "VeloVision · en espera"])
+    tabs = st.tabs(["Simulador", "Mapa de movimiento", "Leaderboard", "Sculptor", "VeloVision", "Modo anotación"])
     with tabs[0]:
         render_simulator(reports, meta)
     with tabs[1]:
         render_movement_map(reports)
     with tabs[2]:
         render_leaderboard(reports, meta, _on_load_pitcher)
+    with tabs[4]:
+        render_velovision_tab()
     with tabs[3]:
+        # VeloVision (arriba) pudo cargar una mecánica medida; se reaplica tras el Simulador, que reescribe el estado
+        apply_velovision_override()
         if render_sculptor_tab is None:
             st.info("Pestaña en construcción.")
         else:
             render_sculptor_tab({"arsenal": reports["arsenal"], "meta": meta, "load_cb": _on_load_pitcher})
-    with tabs[4]:
-        st.markdown(C.wait_screen("VeloVision", "EN ESPERA",
-                                  "Video → arm slot → rango de Stuff+. Pestaña visible mientras la tarea sigue pausada."),
-                    unsafe_allow_html=True)
+    with tabs[5]:
+        render_annotation_tab()
 
 
 if __name__ == "__main__":

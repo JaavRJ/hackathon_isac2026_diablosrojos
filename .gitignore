@@ -17,6 +17,9 @@ data/
 *.pkl
 *.rds
 *.csv.gz
+*.mp4
+*.mov
+*.avi
 !models/*.joblib
 models/*.pkl
 models/*.bin
