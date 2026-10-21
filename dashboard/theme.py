@@ -370,6 +370,9 @@ svg .comp{stroke:#B9C0CA;stroke-width:1.2;stroke-dasharray:3 3}
   border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:.8rem 1rem !important}
 .st-key-stamp{background:linear-gradient(180deg,#fff,#F3F5F8)}
 .dr-tblwrap{max-height:30rem;overflow:auto}
+.dr-tblx{max-height:none}
+.dr-fams{overflow-x:auto}
+.dr-famin{display:flex;flex-direction:column;gap:.35rem;min-width:34rem}
 table.dr-tbl{width:100%;border-collapse:collapse;font-size:.9rem}
 table.dr-tbl th{position:sticky;top:0;background:var(--card);font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;
   color:var(--muted);font-weight:700;text-align:left;padding:.3rem .4rem;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -490,6 +493,7 @@ h1,h2,h3,h4,[data-testid="stMarkdownContainer"] h3{color:var(--text) !important}
 [data-testid="stFileUploaderDropzoneInstructions"] > div > span,[data-testid="stFileUploaderDropzoneInstructions"] small{display:none}
 [data-testid="stFileUploaderDropzoneInstructions"] > div::before{content:"máx. 60 MB · MP4, MOV";font-size:.85rem;color:var(--muted)}
 [data-testid="stFileUploaderDropzone"] button{font-size:0 !important}
+[data-testid="stFileUploaderDropzone"] button [data-testid="stMarkdownContainer"]{display:none !important}
 [data-testid="stFileUploaderDropzone"] button::after{content:"Subir video";font-size:.875rem;font-weight:600;color:var(--text)}
 
 /* ---- widgets nativos: neutralizar el primario (rojo = solo marca) ---- */
@@ -519,6 +523,9 @@ h1,h2,h3,h4,[data-testid="stMarkdownContainer"] h3{color:var(--text) !important}
 [data-testid="stDataFrame"]{border:1px solid var(--line);border-radius:12px;overflow:hidden}
 [data-testid="stAlert"]{border-radius:12px}
 label, [data-testid="stWidgetLabel"] p{color:var(--muted);font-size:.8rem;font-weight:600}
+
+/* ---- Sculptor, VeloVision y Modo anotacion: contenido al 125 % (como zoom 125 % solo en esas pestanas) ---- */
+.st-key-zoom_sculptor, .st-key-zoom_velovision, .st-key-zoom_annotation{zoom:1.25}
 """
 
 

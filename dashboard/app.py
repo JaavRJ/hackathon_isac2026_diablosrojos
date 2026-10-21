@@ -544,16 +544,16 @@ def main() -> None:
         render_movement_map(reports)
     with tabs[2]:
         render_leaderboard(reports, meta, _on_load_pitcher)
-    with tabs[4]:
+    with tabs[4], st.container(key="zoom_velovision"):
         render_velovision_tab()
-    with tabs[3]:
+    with tabs[3], st.container(key="zoom_sculptor"):
         # VeloVision (arriba) pudo cargar una mecánica medida; se reaplica tras el Simulador, que reescribe el estado
         apply_velovision_override()
         if render_sculptor_tab is None:
             st.info("Pestaña en construcción.")
         else:
             render_sculptor_tab({"arsenal": reports["arsenal"], "meta": meta, "load_cb": _on_load_pitcher})
-    with tabs[5]:
+    with tabs[5], st.container(key="zoom_annotation"):
         render_annotation_tab()
 
 

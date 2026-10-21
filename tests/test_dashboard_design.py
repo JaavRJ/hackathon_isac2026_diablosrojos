@@ -203,3 +203,15 @@ def test_map_overlay_uses_last_sim_results():
     fig = ui.fig_movement_heatmap(m, "delta_stuff_cdmx", "t", active)
     assert len(fig.data) == 3 and fig.data[0].zmid == 0 and isinstance(fig, go.Figure)
     assert BRAND.lower() not in fig.to_json().lower()
+
+
+def test_root_font_size_is_original_and_zoom_rule_for_three_tabs():
+    """Raiz original (Simulador, Mapa y Leaderboard sin cambios) y zoom 1.25 solo en Sculptor, VeloVision y anotacion."""
+    assert "html:root{font-size:clamp(9px,min(0.96vw,1.55vh),20px) !important}" in T._BASE_CSS
+    m = re.search(r"((?:\.st-key-zoom_\w+,?\s*)+)\{zoom:1\.25\}", T._BASE_CSS)
+    assert m, "falta la regla zoom:1.25"
+    keys = set(re.findall(r"st-key-(zoom_\w+)", m.group(1)))
+    assert keys == {"zoom_sculptor", "zoom_velovision", "zoom_annotation"}
+    src = APP.read_text(encoding="utf-8")
+    for k in keys:
+        assert f'st.container(key="{k}")' in src

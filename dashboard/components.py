@@ -587,7 +587,7 @@ def family_ranges(families: Sequence[dict], min_pitchers: int) -> str:
             f'<span>{delta_badge(d["p50"], 2)}</span><span class="mut n">{f["n_pitchers"]} pitchers</span></div>')
     leg = ('<div class="dr-legend"><span>barra sólida = p25–p75</span><span>franja tenue = p10–p90</span>'
            '<span>marca = mediana de Stuff+ CDMX</span><span>Δ = ΔStuff+ CDMX mediano (CDMX − mar)</span></div>')
-    return f'<div class="dr-fams">{"".join(rows)}</div>{leg}'
+    return f'<div class="dr-fams"><div class="dr-famin">{"".join(rows)}</div></div>{leg}'
 
 
 def narrowing_table(rows: Sequence[dict]) -> str:
@@ -602,5 +602,5 @@ def narrowing_table(rows: Sequence[dict]) -> str:
         body.append(f'<tr><td><b>{esc(r["pitch_id"])}</b></td><td>{fmt(r["width_p25_p75_without_velo"])}</td>'
                     f'<td>{fmt(r["width_p25_p75_with_velo"])}</td><td>{chs}</td>'
                     f'<td>{r["n_pitchers_without_velo"]} → {r["n_pitchers_with_velo"]}</td></tr>')
-    return ('<table class="dr-tbl"><thead><tr><th>Familia</th><th>Ancho p25–p75 sin radar</th><th>con radar</th>'
-            f'<th>Cambio</th><th>Pitchers</th></tr></thead><tbody>{"".join(body)}</tbody></table>')
+    return ('<div class="dr-tblwrap dr-tblx"><table class="dr-tbl"><thead><tr><th>Familia</th><th>Ancho p25–p75 sin radar</th><th>con radar</th>'
+            f'<th>Cambio</th><th>Pitchers</th></tr></thead><tbody>{"".join(body)}</tbody></table></div>')
