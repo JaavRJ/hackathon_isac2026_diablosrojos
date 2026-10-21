@@ -1,0 +1,17 @@
+# Tema claro sport-tech de Diablos AeroVision (HACK-019, Fase 1).
+# El primario (#CE1126) es SOLO rojo de marca: logo, pestana activa, boton primario y preset activo.
+# El CSS de dashboard/theme.py neutraliza ese color en sliders, chips y demas widgets de datos.
+[theme]
+base = "light"
+primaryColor = "#CE1126"
+backgroundColor = "#F6F7F9"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#14181F"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true

@@ -29,7 +29,7 @@
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
 | **HACK-017** | S3 | P1 | `AVAILABLE` | `HACK-014` | Módulo **VeloVision** (MediaPipe Pose $\to$ rango Stuff+ CDMX) + validación manual (`src/vision/pose_slot.py`) |
 | **HACK-018** | S4 | P1 | `AVAILABLE` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/`) |
-| **HACK-019** | S3 | P1 | `IN_PROGRESS` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
+| **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
 
 ---
 
@@ -614,6 +614,12 @@
 
 - **Revisión independiente 2026-10-20 (APPROVED):** Verify `python -m pytest -q tests/test_hypotheses_channels.py` -> 7 passed, exit 0. Diff limitado a `analysis/run_hypotheses.py` y `tests/test_hypotheses_channels.py`; CSV de `reports/altitude/` solo los 3 de AllowedPaths. CSV reales: total = -0.0141316, stuff = -0.0003433, parque BIP = -0.0060007, residuo no atribuido = -0.0077876; suma - total = 9.9e-17 (atol 1e-10 OK); share_of_total suma 1.0 (0.024/0.425/0.551); `decomposition_type = three_term`, sin `NOT_ESTIMABLE`; residuo con CI/p/n_pitchers=778 propios y etiqueta `residuo_no_atribuido (no se atribuye a ningún canal)`. `pitch_id` invariante (run_hypotheses.py:169-170) y bootstrap/agrupación por `pitcher_anon_id` (:72, :195). Conversión Score+ -> xRV (:204-205) correcta: `stuff.py:684-692` define Score+ = 100 + 10*(pred-mu)/sigma y `pred` es la salida del meta-ridge entrenado sobre el residuo de `xrv_pitcher` (+ = bueno para el pitcher, CONTRACT), así que Δpred = (Δ Score+/10)*sigma_neutral_ está en unidades xRV con signo coherente. La caída de Stuff de -0.00117 a -0.00034 es plausible: al ser residuo sobre el conteo, el modelo ya no absorbe varianza de conteo y el meta-ridge contrae más; el orden de magnitud sigue siendo pequeño y el CI excluye 0 (no verificado con reentrenamiento independiente). Honestidad: parque descrito como contraste descriptivo en BIP, "no causal" (:231, :345); el 55 % residual queda sin atribuir; sin cifras inventadas. Observación no bloqueante: Stuff explica solo ~2 % del total y el residuo es el término mayor; conviene decirlo así en el informe final.
 - **Revisión independiente de la re-corrida (2026-10-20, tras segunda reapertura de HACK-010): APPROVED.** Verify `python -m pytest -q tests/test_hypotheses_channels.py` -> 7 passed, exit 0. La re-corrida solo cambió los 3 CSV de `reports/altitude/`; `analysis/run_hypotheses.py` y su test sin cambios (el resto del working tree es HACK-010). Cifras nuevas: total = -0.014132; Stuff = -0.001278 (9.0 %, IC -0.001339/-0.001214); parque BIP = -0.006001 (42.5 %); residuo no atribuido = -0.006853 (48.5 %); suma - total = 1.0e-16 (atol 1e-10 OK), shares suman 1.0, `decomposition_type = three_term`, residuo con etiqueta propia, CI y n_pitchers=778. Checklist: `pitch_id` (run_hypotheses.py:169-170) y bootstrap por `pitcher_anon_id`. Conversión Score+ -> xRV (:204-205) correcta con sigma_neutral_ = 0.0430. H1-H4 bien planteadas; Sinker (HB) y Changeup se reportan tal cual, sin forzar. Parque descrito como no causal. Observaciones no bloqueantes: (a) Stuff pasó de 2.4 % a 9.0 % pero sigue siendo pequeño; el residuo (48.5 %) es el mayor término junto con el parque, y el informe debe decirlo. (b) Discrepancia a explicar, no bloqueante: reproduje el contrafactual de `run_hypotheses.py` con `models/stuff_model.joblib` y rho = mediana Extreme. El delta medio por fila es -0.206 Score+ en No Altitude (296,675 filas) y +0.078 en Extreme (182,474 filas), muy por debajo del ΔStuff+ CDMX medio de -1.52 de `stuff_diagnostics.csv`. El canal Stuff (-0.00128 xRV) es coherente con ese contrafactual de la re-corrida pero no con el -1.52 (que implicaría -0.0066 xRV); probablemente se deba a muestra/rho/modelo distintos en el diagnóstico, sin confirmar. El canal Stuff debe leerse como cota baja y el informe no debe citar -1.52 y 9.0 % como si fueran la misma medida. (c) En `delta_by_pitch_shape.csv` `delta_stuff_cdmx` es la diferencia Extreme-vs-Neutral del delta contrafactual por fila (Four-Seam +2.19), no el ΔStuff+ de HACK-010 (-4.57); no deben compararse directamente.
+- **Corrección del Orquestador (2026-10-21), basada en una reconciliación de solo lectura:**
+  - La nota anterior usa `sigma_neutral_ = 0.0430`, que es del modelo previo. El modelo vigente (`models/stuff_model.joblib`, regenerado el 2026-10-21) tiene **`sigma_neutral_ = 0.005378`**, así que **1 punto de Stuff+ = 0.000538 xRV/pitcheo**.
+  - Con ese sigma, el ΔStuff+ CDMX medio del export (−2.34 pts) equivale a −0.00126 xRV, **coherente** con el canal Stuff (−0.001278). La "discrepancia" de la observación (b) queda **retirada**.
+  - El −1.52 de `stuff_diagnostics.csv` es la media equiponderada de una muestra estratificada por `pitch_id`; reponderado a la mezcla real da −2.35.
+  - El −0.206 de esa observación se midió con el modelo anterior.
+  - Mejora metodológica recomendada, pendiente de decisión: calcular el canal Stuff solo sobre filas No Altitude trasladadas a CDMX (−0.001551 xRV, IC95 −0.001618/−0.001483, 11.0 %), y renombrar `delta_stuff_cdmx` en `delta_by_pitch_shape.csv`, que mide la asimetría Extreme − No Altitude del contrafactual y no un efecto de altitud.
 
 ---
 
@@ -819,7 +825,7 @@
 ---
 
 ### `HACK-019` — Rediseño Visual de Diablos AeroVision (`dashboard/`)
-- **State:** `IN_PROGRESS` (Fase 0 aprobada por el usuario el 2026-10-20: mockup v2 en modo claro, `docs/mockups/hack019_mockup.html`. Siguiente: Fase 1)
+- **State:** `APPROVED` (Fase 0 aprobada el 2026-10-20; Fases 1–3 implementadas el 2026-10-21; revisión independiente 2026-10-21)
 - **Sprint:** 3 · **Priority:** `P1` · **DependsOn:** `HACK-015, HACK-016`
 - **AllowedPaths:**
   - `docs/mockups/hack019_mockup.html` (Fase 0)
@@ -836,8 +842,19 @@
   python -m pytest -q tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_sculptor.py
   ```
 - **Reviewer Checklist:**
-  - [ ] ¿El rojo `#CE1126` solo aparece como marca y nunca como dato?
-  - [ ] ¿ρ̂ CDMX y la descomposición se leen de modelo/CSV, sin cifras hardcodeadas?
-  - [ ] ¿Contraste medido ≥ 4.5:1 en texto normal?
-  - [ ] ¿Se conservan literales los textos de honestidad de HACK-015/016?
+  - [x] ¿El rojo `#CE1126` solo aparece como marca y nunca como dato?
+  - [x] ¿ρ̂ CDMX y la descomposición se leen de modelo/CSV, sin cifras hardcodeadas?
+  - [x] ¿Contraste medido ≥ 4.5:1 en texto normal?
+  - [x] ¿Se conservan literales los textos de honestidad de HACK-015/016?
+
+#### Notas de Revisión (Revisor independiente, 2026-10-21): APPROVED
+- **Verify:** `python -m pytest -q tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_sculptor.py` -> 45 passed, exit 0. Carga en frío 2.67 s (límite 20 s); predicción en caliente 0.60 s solo simulación / 0.87 s con SHAP y figuras (límite 3 s); corrida headless completa 2.70 s.
+- **Alcance:** solo `dashboard/**` (app.py, ui_utils.py, sculptor_tab.py + nuevos components.py, leaderboard_tab.py, theme.py), `.streamlit/config.toml`, `tests/test_dashboard_smoke.py` (una aserción relajada a `.lower()` por el nuevo rótulo) y `tests/test_dashboard_design.py`. Sin lectura de parquet ni rutas absolutas en `dashboard/`.
+- **Rojo de marca:** `#CE1126` solo en `theme.py` (token BRAND: barra superior, wordmark, botón primario, pestaña activa) y `components.py:353-355` (preset activo). No está en la plantilla Plotly, escalas ni funciones `fig_*`. Los tests lo verifican por inspección.
+- **Contraste (recalculado):** todos los tokens de texto >= 4.5:1 sobre blanco (mín. 5.17 CAT_STUFF) y >= 4.6 sobre SOFT; pares tintados 4.66-9.19; LVL_SEA 3.56 (solo gráfico). El borde punteado `#98A1AE` (2.5:1) es decorativo.
+- **Cifras:** ρ̂ CDMX sale de `rho_extreme_median_` (`ui_utils.py:187`; el 0.852 es solo respaldo de `getattr`), descomposición de `channel_decomposition.csv`, anclas de `reports/validation`. Grep propio sin cifras de resultados hardcodeadas.
+- **Honestidad:** textos literales de HACK-015/016 conservados (residuo, nota poblacional, nota Canal Stuff, CDMX = mediana de Altitud Extrema, física simple y medianas, `COACHING_LABEL` y `DELTA_DISCLAIMER` importados de `src/sculptor/optimizer.py`). Veredicto generado de `res` (`verdict_parts`); Referencia con "observado en pares reales, no causal"; presets y bandas p10–p90 desde percentiles ponderados reales del catálogo (`n` visible); columna "± pendiente" sin IC inventado; NaN por pitcher -> "no estimable".
+- **Física/modelo:** los features de Stuff+ no incluyen VertRelAngle, HorzRelAngle_norm ni túnel a 170 ms. Perturbación headless: `in_tunnel_sim_170ms`, `in_plate_side`, `in_plate_height` no cambian Stuff+ (99.8 -> 89.3 idéntico); `tunnel_sim_release` sí (99.6 -> 89.1), y está correctamente en el grupo Stuff+.
+- **Visual:** AppTest sin excepciones en las 5 pestañas; servidor propio (puerto 8503, ya apagado) sin errores de consola; sin "Choose options", "Right/Left" ni "optimizar" visibles.
+- **Observaciones no bloqueantes:** (a) en `tests/test_dashboard_design.py::test_no_hardcoded_result_figures` la lista `banned` solo cubre cifras puntuales (0.852, 0.014, 102.1, 4.50 %…): no detectaría otras cifras nuevas; el grep de esta revisión sí las cubrió. (b) Preset "Sweeper" usa el p10 global de `hb_norm` sin separar mano (HB ya está normalizado). (c) No hay sliders de VertRelAngle/HorzRelAngle_norm: solo la nota de que no alteran Stuff+. (d) Criterio 5 del plan (capturas 1440×900 y 1920×1080 revisadas por el usuario) queda a cargo del Orquestador/usuario.
 

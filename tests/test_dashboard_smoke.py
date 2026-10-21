@@ -243,7 +243,7 @@ def test_app_runs_headless_in_spanish(bundle, capsys):
     for label in ("Canal Stuff", "Canal Parque (BIP)", "Residuo no atribuido (no se atribuye a ningún canal)"):
         assert label in shown
     html = " ".join(m.value for m in at.markdown)
-    assert "Nivel del Mar" in html and "Estadio Alfredo Harp Helú" in html and "ΔStuff+" in html
+    assert "nivel del mar" in html.lower() and "Estadio Alfredo Harp Helú" in html and "ΔStuff+" in html
     with capsys.disabled():
         print(f"\n[HACK-015] corrida headless completa de app.py (primera ejecucion): {run_s:.2f} s")
 
