@@ -1,0 +1,14 @@
+{
+  "complete": true,
+  "run_signature": "3e28ba1a496f999d526a486f123c07c455839fd2d9de5e4627ea029cd83f8d6d",
+  "completed_holdouts": [
+    "pitcher_fold_1",
+    "pitcher_fold_2",
+    "pitcher_fold_3",
+    "pitcher_fold_4",
+    "pitcher_fold_5",
+    "season",
+    "park"
+  ],
+  "stability_complete": true
+}

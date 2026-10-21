@@ -1,0 +1,22 @@
+{
+  "input_file": "data/stuff_processed_df.parquet",
+  "input_bytes": 330807091,
+  "rows": 634624,
+  "columns": 123,
+  "started_utc": "2026-10-20T21:38:02.292299+00:00",
+  "training_started_utc": "2026-10-20T21:38:08.763886+00:00",
+  "finished_utc": "2026-10-20T21:41:56.409286+00:00",
+  "pid": 24540,
+  "load_seconds": 1.6737963999912608,
+  "signature_seconds": 0.8226041000016266,
+  "partition_build_seconds": 3.9705418000085047,
+  "partition_training_and_scoring_seconds": 227.61967749999894,
+  "holdout": "pitcher_fold_1",
+  "train_rows": 399244,
+  "test_rows": 99808,
+  "completed_holdouts": [
+    "pitcher_fold_1"
+  ],
+  "complete": false,
+  "stability_complete": false
+}

@@ -616,3 +616,55 @@ def test_stuff_model_recompute_arsenal_diffs_at_density(
     assert "hb_diff_vs_fb" in recomputed_single.columns
     assert not recomputed_single["ivb_diff_vs_fb"].isna().any()
     assert not recomputed_single["hb_diff_vs_fb"].isna().any()
+
+
+# ==============================================================================
+# 11. Stuff+ como residuo sobre el conteo (reapertura HACK-010)
+# ==============================================================================
+
+def test_count_changes_predict_outcomes_but_not_stuff_plus(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """Balls/Strikes no cambian stuff_plus_neutral, pero si predict_outcomes (offset)."""
+    train_df, test_df = processed_lmb_dataset
+    model = StuffPlusModel().fit(train_df)
+
+    perturbed = test_df.copy()
+    perturbed["Balls"] = 3
+    perturbed["Strikes"] = 0
+    if "count" in perturbed.columns:
+        perturbed["count"] = "3-0"
+
+    np.testing.assert_allclose(
+        model.predict_scores(test_df)["stuff_plus_neutral"].to_numpy(),
+        model.predict_scores(perturbed)["stuff_plus_neutral"].to_numpy(),
+        rtol=1e-10,
+        atol=1e-10,
+    )
+
+    out_base = model.predict_outcomes(test_df)
+    out_pert = model.predict_outcomes(perturbed)
+    assert not np.allclose(out_base.to_numpy(), out_pert.to_numpy())
+
+    # El offset de conteo existe como baseline interno (no es feature)
+    assert isinstance(model.count_baseline_, CountBaselineModel)
+    assert not ({"Balls", "Strikes", "count"} & set(model.feature_cols))
+
+
+def test_predict_outcomes_valid_probabilities_no_nan(
+    processed_lmb_dataset: tuple[pd.DataFrame, pd.DataFrame],
+):
+    """predict_outcomes: columnas TARGET_COLS, sin NaN, binarios en [0,1] (clip 1e-6)."""
+    train_df, test_df = processed_lmb_dataset
+    model = StuffPlusModel().fit(train_df)
+
+    out = model.predict_outcomes(test_df)
+    assert list(out.columns) == TARGET_COLS
+    assert len(out) == len(test_df)
+    assert (out.index == test_df.index).all()
+    assert not out.isna().any().any()
+    assert (out.dtypes == np.float64).all()
+    binary = [c for c in TARGET_COLS if c != "xrv_pitcher"]
+    assert (out[binary] >= 1e-6).all().all()
+    assert (out[binary] <= 1.0 - 1e-6).all().all()
+    assert (out[binary] >= 0.0).all().all() and (out[binary] <= 1.0).all().all()

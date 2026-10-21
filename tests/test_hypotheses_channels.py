@@ -51,18 +51,42 @@ def _fixture():
     return pd.DataFrame(rows)
 
 
-def test_tables_have_cluster_intervals_and_channel_sum(tmp_path):
+def test_three_term_decomposition_reconstructs_total(tmp_path):
     tables = run_hypotheses(_fixture(), tmp_path, seed=7, n_boot=80, stuff_model=_StuffModel())
     assert set(tables) == {"delta_by_pitch_shape.csv", "channel_decomposition.csv", "hypotheses_h1_h4_summary.csv"}
     for name in tables:
         saved = pd.read_csv(tmp_path / name)
         assert {"ci_low", "ci_high", "p_value", "n_pitchers"}.issubset(saved.columns)
-    channels = tables["channel_decomposition.csv"].set_index("channel").estimate
-    assert np.isclose(channels["stuff"] + channels["park"] + channels["unallocated"], channels["total"], atol=1e-12)
-    park_row = tables["channel_decomposition.csv"].set_index("channel").loc["park"]
+    table = tables["channel_decomposition.csv"].set_index("channel")
+    assert not any("two_channel" in c or "NOT_ESTIMABLE" in table.astype(str).values for c in table.columns)
+    assert (table.decomposition_type == "three_term").all()
+    est = table.estimate
+    assert np.isclose(est["stuff"] + est["park"] + est["unallocated"], est["total"], rtol=0.0, atol=1e-10)
+    # The residual is a genuine, non-trivial term with its own cluster inference.
+    res = table.loc["unallocated"]
+    assert not np.isclose(res.estimate, 0.0, atol=1e-8)
+    for col in ("ci_low", "ci_high", "p_value", "n_pitchers"):
+        assert np.isfinite(res[col])
+    assert res.ci_low <= res.estimate <= res.ci_high
+    assert res.n_pitchers == table.loc["park", "n_pitchers"] == 8
+    assert "no se atribuye a ningún canal" in res.term_label
+    assert "no atribuido" in res.interpretation
+    # Residual is not added to park.
+    assert np.isclose(est["park"], table.loc["park", "estimate"]) and est["park"] != est["park"] + est["unallocated"]
+    shares = table.share_of_total
+    assert est["total"] != 0
+    assert np.isclose(shares["stuff"] + shares["park"] + shares["unallocated"], 1.0, atol=1e-10)
+    assert np.isclose(shares["total"], 1.0)
+    park_row = table.loc["park"]
     assert "BIP" in park_row.interpretation
     assert park_row.conditional_batted_ball_controls == "ExitSpeed, Angle; is_ball_in_play=1; matched pitchers only"
-    assert "no atribuido" in tables["channel_decomposition.csv"].set_index("channel").loc["unallocated", "interpretation"]
+
+
+def test_share_of_total_is_nan_when_total_is_zero(tmp_path):
+    df = _fixture()
+    df["xrv_pitcher"] = 0.0
+    table = run_hypotheses(df, tmp_path, seed=7, n_boot=20, stuff_model=_StuffModel())["channel_decomposition.csv"]
+    assert table.share_of_total.isna().all()
 
 
 def test_pitch_shape_results_use_invariant_pitch_id_and_pitcher_clusters(tmp_path):

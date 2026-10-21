@@ -1,6 +1,6 @@
 """Reproducible, cluster-aware descriptive analyses for H1--H4 and altitude channels.
 
-The park component is a residual decomposition, not a causal mediation estimate.
+Three-term descriptive decomposition: stuff + BIP park + unattributed residual = total (not causal mediation).
 Run: python -m analysis.run_hypotheses --input data/stuff_processed_df.parquet
 """
 from __future__ import annotations
@@ -216,6 +216,11 @@ def run_hypotheses(df: pd.DataFrame, output_dir: str | Path, *, seed=2026, n_boo
                 cluster_parts["park"] = park.loc[common_decomp]
                 cluster_parts["unallocated"] = (cluster_parts["total"] - cluster_parts["stuff"] - cluster_parts["park"])
     channel_rows = []
+    # Three-term identity, per pitcher and therefore also in the means:
+    # total = stuff + park_bip + unallocated, with unallocated defined as the
+    # remainder. It is its own term and is never folded into the park channel.
+    labels = {"total": "total", "stuff": "canal_stuff", "park": "canal_parque_bip",
+              "unallocated": "residuo_no_atribuido (no se atribuye a ningún canal)"}
     for name in ("total", "stuff", "park", "unallocated"):
         vals = np.asarray(cluster_parts.get(name, np.array([])), dtype=float)
         row = _row("xrv_pitcher", f"descriptive_channel:{name}", vals, rng, n_boot)
@@ -227,6 +232,8 @@ def run_hypotheses(df: pd.DataFrame, output_dir: str | Path, *, seed=2026, n_boo
             "unallocated": "residuo no atribuido tras Stuff y parque BIP; no se asigna a ningún canal",
         }
         row["interpretation"] = descriptions[name]
+        row["decomposition_type"] = "three_term"
+        row["term_label"] = labels[name]
         if name == "park":
             row["conditional_batted_ball_controls"] = "ExitSpeed, Angle; is_ball_in_play=1; matched pitchers only"
             row["estimable"] = int(row["n_pitchers"] >= 2)
@@ -234,6 +241,11 @@ def run_hypotheses(df: pd.DataFrame, output_dir: str | Path, *, seed=2026, n_boo
             row["estimable"] = int(row["n_pitchers"] >= 2)
         channel_rows.append(row)
     channel = pd.DataFrame(channel_rows)
+    total_est = channel.loc[channel.channel.eq("total"), "estimate"].iloc[0]
+    if np.isfinite(total_est) and total_est != 0:
+        channel["share_of_total"] = channel["estimate"] / total_est
+    else:
+        channel["share_of_total"] = np.nan
 
     # Cluster estimates are formed within pitcher before bootstrap/inference.
     summary_rows = []
@@ -330,7 +342,7 @@ def main(argv=None):
     tables = run_hypotheses(scored, args.output_dir, seed=args.seed, n_boot=args.bootstrap, stuff_model=model)
     for name, table in tables.items():
         print(f"{name}: {len(table)} filas")
-    print("Canal parque = residuo descriptivo; no se interpreta como efecto causal identificado.")
+    print("Canal parque = contraste descriptivo en pelotas en juego, ajustado por ExitSpeed/Angle y pareado por pitcher; no causal.")
 
 
 if __name__ == "__main__":

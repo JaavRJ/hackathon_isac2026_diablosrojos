@@ -69,10 +69,11 @@ from __future__ import annotations
 from typing import Any, Sequence
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier, LGBMRegressor
+from lightgbm import LGBMRegressor
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GroupKFold, KFold
 
+from src.baseline import CountBaselineModel
 from src.config import FASTBALL_TYPES, TARGET_COLS
 from src.io import assert_no_leakage
 from src.models.movement import PhysicsMovementTranslator
@@ -252,6 +253,8 @@ class StuffPlusModel:
         self.best_alpha_: float = 1.0
         # Diccionario congelado de referencia de recta primaria por lanzador
         self.primary_fb_ref_dict_: dict[Any, dict[str, Any]] = {}
+        # Baseline de conteo usado SOLO como offset (nunca como feature)
+        self.count_baseline_: CountBaselineModel | None = None
 
     def _fit_primary_fb_reference(self, train_df: pd.DataFrame) -> None:
         """
@@ -486,6 +489,16 @@ class StuffPlusModel:
         )
         n_samples = len(X_train)
 
+        # 6b. Baseline de conteo (offset): ajustado sobre el mismo conjunto de entrenamiento
+        # de resultados. El conteo entra SOLO como offset; los submodelos aprenden el residuo
+        # y - baseline_conteo(y) a partir de features físicas.
+        self.count_baseline_ = CountBaselineModel().fit(df_stuff_train)
+        base_train = self.count_baseline_.predict(df_stuff_train)
+        resid: dict[str, np.ndarray] = {}
+        for tgt in TARGET_COLS:
+            y_t = pd.to_numeric(df_stuff_train[tgt], errors="coerce").fillna(0.0).to_numpy(dtype=np.float64)
+            resid[tgt] = y_t - base_train[tgt].to_numpy(dtype=np.float64)
+
         # 7. Partición para predicciones Out-Of-Fold (OOF)
         if "pitcher_anon_id" in df_stuff_train.columns:
             n_pitchers = df_stuff_train["pitcher_anon_id"].nunique()
@@ -510,37 +523,9 @@ class StuffPlusModel:
             X_val = X_train.iloc[val_idx]
             min_child_fold = min(20, max(2, len(X_tr) // 5))
 
-            for tgt in BINARY_TARGETS:
-                if tgt not in df_stuff_train.columns:
-                    raise ValueError(f"Falta columna de target '{tgt}' en train_df.")
-                y_b_tr = pd.to_numeric(df_stuff_train[tgt].iloc[train_idx], errors="coerce").fillna(0.0).to_numpy()
-
-                if len(np.unique(y_b_tr)) < 2:
-                    oof_preds[tgt][val_idx] = float(np.mean(y_b_tr))
-                else:
-                    clf_fold = LGBMClassifier(
-                        random_state=42,
-                        n_estimators=60,
-                        learning_rate=0.05,
-                        min_child_samples=min_child_fold,
-                        verbose=-1,
-                    )
-                    clf_fold.fit(X_tr, y_b_tr)
-                    p_val = clf_fold.predict_proba(X_val)[:, 1].astype(np.float64)
-                    oof_preds[tgt][val_idx] = np.clip(p_val, 0.0, 1.0)
-
-            if "xrv_pitcher" not in df_stuff_train.columns:
-                raise ValueError("Falta columna de target 'xrv_pitcher' en train_df.")
-            y_xrv_tr = pd.to_numeric(df_stuff_train["xrv_pitcher"].iloc[train_idx], errors="coerce").fillna(0.0).to_numpy()
-            reg_xrv_fold = LGBMRegressor(
-                random_state=42,
-                n_estimators=60,
-                learning_rate=0.05,
-                min_child_samples=min_child_fold,
-                verbose=-1,
-            )
-            reg_xrv_fold.fit(X_tr, y_xrv_tr)
-            oof_preds["xrv_pitcher"][val_idx] = reg_xrv_fold.predict(X_val).astype(np.float64)
+            for tgt in TARGET_COLS:
+                sub_fold = self._fit_residual_submodel(X_tr, resid[tgt][train_idx], min_child_fold)
+                oof_preds[tgt][val_idx] = self._predict_residual_submodel(sub_fold, X_val)
 
         # 9. Construcción de matriz OOF con restricción de signos físicos:
         # +P(whiff), +P(chase), +P(called_strike), +P(groundball),
@@ -555,7 +540,7 @@ class StuffPlusModel:
             oof_preds["target_out_on_pitch"],
             oof_preds["xrv_pitcher"],
         ])
-        y_xrv_all = pd.to_numeric(df_stuff_train["xrv_pitcher"], errors="coerce").fillna(0.0).to_numpy(dtype=np.float64)
+        y_xrv_all = resid["xrv_pitcher"]
 
         # 10. Selección de regularización mediante Validación Cruzada sobre la rejilla de alphas
         alphas = [0.01, 0.1, 1.0, 10.0, 100.0]
@@ -586,32 +571,11 @@ class StuffPlusModel:
         min_child_full = min(20, max(2, n_samples // 5))
         self.submodels_ = {}
 
-        for tgt in BINARY_TARGETS:
-            y_b = pd.to_numeric(df_stuff_train[tgt], errors="coerce").fillna(0.0).to_numpy()
-            if len(np.unique(y_b)) < 2:
-                const_val = float(np.mean(y_b))
-                self.submodels_[tgt] = ("constant", const_val)
-            else:
-                clf = LGBMClassifier(
-                    random_state=42,
-                    n_estimators=60,
-                    learning_rate=0.05,
-                    min_child_samples=min_child_full,
-                    verbose=-1,
-                )
-                clf.fit(X_train, y_b)
-                self.submodels_[tgt] = clf
+        for tgt in TARGET_COLS:
+            self.submodels_[tgt] = self._fit_residual_submodel(X_train, resid[tgt], min_child_full)
 
-        reg_xrv = LGBMRegressor(
-            random_state=42,
-            n_estimators=60,
-            learning_rate=0.05,
-            min_child_samples=min_child_full,
-            verbose=-1,
-        )
-        reg_xrv.fit(X_train, y_xrv_all)
-        self.submodels_["xrv_pitcher"] = reg_xrv
-        self.booster_ = reg_xrv.booster_
+        reg_xrv = self.submodels_["xrv_pitcher"]
+        self.booster_ = reg_xrv.booster_ if hasattr(reg_xrv, "booster_") else None
 
         # 12. Calibración de Escala Neutral (rho_0 = 1.000) sobre todos los lanzamientos LMB de referencia
         df_neutral_ref = self.movement_translator_.translate_movement(df_train, target_rho=1.000)
@@ -626,9 +590,31 @@ class StuffPlusModel:
         self.is_fitted_ = True
         return self
 
+    @staticmethod
+    def _fit_residual_submodel(X: pd.DataFrame, r: np.ndarray, min_child: int) -> Any:
+        """Ajusta un regresor LightGBM sobre un residuo; constante si el residuo es degenerado."""
+        if len(r) == 0 or float(np.std(r)) < 1e-12:
+            return ("constant", float(np.mean(r)) if len(r) else 0.0)
+        reg = LGBMRegressor(
+            random_state=42,
+            n_estimators=60,
+            learning_rate=0.05,
+            min_child_samples=min_child,
+            verbose=-1,
+        )
+        reg.fit(X, r)
+        return reg
+
+    @staticmethod
+    def _predict_residual_submodel(sub: Any, X: pd.DataFrame) -> np.ndarray:
+        if isinstance(sub, tuple) and sub[0] == "constant":
+            return np.full(len(X), sub[1], dtype=np.float64)
+        return np.asarray(sub.predict(X), dtype=np.float64)
+
     def _predict_submodels(self, df: pd.DataFrame) -> dict[str, np.ndarray]:
         """
-        Genera las predicciones individuales de cada uno de los 8 submodelos.
+        Genera los RESIDUOS predichos (y - baseline_conteo) de los 8 submodelos.
+        No depende del conteo.
         """
         X, _ = _prepare_stuff_features(
             df,
@@ -636,20 +622,7 @@ class StuffPlusModel:
             cat_categories=self.cat_categories_,
             feature_medians=self.feature_medians_,
         )
-        n_samples = len(X)
-        preds: dict[str, np.ndarray] = {}
-
-        for tgt in BINARY_TARGETS:
-            sub = self.submodels_[tgt]
-            if isinstance(sub, tuple) and sub[0] == "constant":
-                preds[tgt] = np.full(n_samples, sub[1], dtype=np.float64)
-            else:
-                p = sub.predict_proba(X)[:, 1].astype(np.float64)
-                preds[tgt] = np.clip(p, 0.0, 1.0)
-
-        reg_xrv = self.submodels_["xrv_pitcher"]
-        preds["xrv_pitcher"] = reg_xrv.predict(X).astype(np.float64)
-        return preds
+        return {tgt: self._predict_residual_submodel(self.submodels_[tgt], X) for tgt in TARGET_COLS}
 
     def _predict_stuff_value(self, df: pd.DataFrame) -> np.ndarray:
         """
@@ -728,18 +701,35 @@ class StuffPlusModel:
 
         return out
 
+    def predict_outcomes(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Predicciones de resultado por target: baseline_conteo(df) + residuo_stuff(df).
+
+        El residuo (independiente del conteo) se evalua con las features fisicas de df;
+        para xrv_pitcher se usa el combinador meta_ridge_. Los 7 binarios se recortan a
+        [1e-6, 1-1e-6]. Columnas identicas a CountBaselineModel.predict (TARGET_COLS).
+        """
+        if not self.is_fitted_ or self.count_baseline_ is None:
+            raise RuntimeError("StuffPlusModel debe entrenarse con fit() antes de predict_outcomes().")
+
+        base = self.count_baseline_.predict(df)
+        resid = self._predict_submodels(df)
+        resid["xrv_pitcher"] = self._predict_stuff_value(df)
+
+        out: dict[str, np.ndarray] = {}
+        for tgt in TARGET_COLS:
+            vals = base[tgt].to_numpy(dtype=np.float64) + resid[tgt]
+            if tgt in BINARY_TARGETS:
+                vals = np.clip(vals, 1e-6, 1.0 - 1e-6)
+            out[tgt] = vals
+        return pd.DataFrame(out, index=df.index)[TARGET_COLS].astype(np.float64)
+
     def predict(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Devuelve un DataFrame con las columnas exactas TARGET_COLS para compatibilidad
-        directa con evaluate_against_baseline de HACK-007 y suites de validación.
+        Alias de predict_outcomes: DataFrame con las columnas exactas TARGET_COLS para
+        evaluate_against_baseline de HACK-007 y suites de validacion.
         """
-        if not self.is_fitted_:
-            raise RuntimeError("StuffPlusModel debe entrenarse con fit() antes de predict().")
-
-        raw_preds = self._predict_submodels(df)
-        raw_preds["xrv_pitcher"] = self._predict_stuff_value(df)
-
-        return pd.DataFrame(raw_preds, index=df.index)[TARGET_COLS].astype(np.float64)
+        return self.predict_outcomes(df)
 
     def explain_pitch(
         self,
@@ -833,41 +823,23 @@ class StuffPlusModel:
         for tgt in TARGET_COLS:
             w_tgt = target_weights[tgt]
 
-            if tgt == "xrv_pitcher":
-                reg_xrv = self.submodels_["xrv_pitcher"]
-                contrib_raw = reg_xrv.booster_.predict(X_row, pred_contrib=True)[0]
+            sub = self.submodels_[tgt]
+            if isinstance(sub, tuple) and sub[0] == "constant":
+                const_v = float(sub[1])
+                sub_bases.append(w_tgt * const_v)
+                sub_contribs.append(np.zeros(n_features, dtype=np.float64))
+                if tgt == "xrv_pitcher":
+                    direct_xrv_base_val = const_v
+            else:
+                # Regresor sobre residuo: TreeSHAP exacto y aditivo en la escala del residuo
+                contrib_raw = sub.booster_.predict(X_row, pred_contrib=True)[0]
                 feat_c = contrib_raw[:-1].astype(np.float64)
                 base_c = float(contrib_raw[-1])
-
-                direct_xrv_base_val = base_c
-                direct_xrv_feat_c = feat_c
-
+                if tgt == "xrv_pitcher":
+                    direct_xrv_base_val = base_c
+                    direct_xrv_feat_c = feat_c
                 sub_bases.append(w_tgt * base_c)
                 sub_contribs.append(w_tgt * feat_c)
-            else:
-                sub = self.submodels_[tgt]
-                if isinstance(sub, tuple) and sub[0] == "constant":
-                    const_p = float(sub[1])
-                    sub_bases.append(w_tgt * const_p)
-                    sub_contribs.append(np.zeros(n_features, dtype=np.float64))
-                else:
-                    raw_contrib = sub.booster_.predict(X_row, pred_contrib=True)[0]
-                    raw_feat_c = raw_contrib[:-1].astype(np.float64)
-                    b_k = float(raw_contrib[-1])
-                    z_k = float(np.sum(raw_feat_c) + b_k)
-
-                    p_k = float(1.0 / (1.0 + np.exp(-z_k)))
-                    p_k0 = float(1.0 / (1.0 + np.exp(-b_k)))
-
-                    diff_z = z_k - b_k
-                    if abs(diff_z) < 1e-12:
-                        alpha_k = 0.0
-                    else:
-                        alpha_k = (p_k - p_k0) / diff_z
-
-                    prob_feat_c = alpha_k * raw_feat_c
-                    sub_bases.append(w_tgt * p_k0)
-                    sub_contribs.append(w_tgt * prob_feat_c)
 
         # 6. Agregación en escala combinada stuff_value
         stuff_val_base = float(self.meta_ridge_.intercept_) + float(sum(sub_bases))
