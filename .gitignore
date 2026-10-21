@@ -17,7 +17,7 @@ data/
 *.pkl
 *.rds
 *.csv.gz
-models/*.joblib
+!models/*.joblib
 models/*.pkl
 models/*.bin
 
