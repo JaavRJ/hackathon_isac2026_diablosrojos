@@ -1,25 +1,18 @@
-# Requisitos del proyecto ISAC 2026 - Diablos Rojos
-# Python >= 3.11. pyarrow >= 20.0 es mandatorio para el dataset de ISAC.
-pyarrow>=20.0.0
-pandas>=2.2.0
-numpy>=1.26.0
-scipy>=1.11.0
-scikit-learn>=1.5.0
-lightgbm>=4.3.0
-xgboost>=2.0.0
-catboost>=1.2.0
-econml>=0.14.0
-shap>=0.46.0
+# Requisitos de la APP DESPLEGADA (Streamlit Community Cloud) - Diablos AeroVision.
+# Versiones fijadas = las probadas en .venv (Python 3.12) el 2026-10-21. Ver docs/DEPLOY.md.
+# Dependencias de analisis/entrenamiento/tests: requirements-dev.txt.
+streamlit==1.66.0
+streamlit-image-coordinates==0.4.1
+plotly==7.1.0
+pandas==3.0.6
+numpy==2.5.4
+pyarrow==26.0.0
+scipy==1.18.1
+scikit-learn==1.9.1
+lightgbm==4.7.0
+joblib==1.6.0
 
-# Computer Vision & Video Ingestion (VeloVision)
-opencv-python>=4.8.0
-mediapipe>=0.10.0
-
-# Visualización y Dashboard
-streamlit>=1.38.0
-plotly>=5.22.0
-kaleido>=0.2.1
-matplotlib>=3.8.0
-seaborn>=0.12.0
-fastapi>=0.100.0
-uvicorn>=0.22.0
+# VeloVision (computer vision). mediapipe 1.1.1 es py3-none-manylinux_2_28_x86_64 (sirve en Python 3.12).
+# mediapipe arrastra opencv-contrib-python; se fija headless a la MISMA version para no mezclar builds de cv2.
+mediapipe==1.1.1
+opencv-python-headless==5.0.0.93

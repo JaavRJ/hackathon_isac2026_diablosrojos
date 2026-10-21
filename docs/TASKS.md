@@ -27,9 +27,10 @@
 | **HACK-014** | S2 | P0 | `APPROVED` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
-| **HACK-017** | S3 | P1 | `AVAILABLE` | `HACK-014` | Módulo **VeloVision** (MediaPipe Pose $\to$ rango Stuff+ CDMX) + validación manual (`src/vision/pose_slot.py`) |
+| **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores (`src/vision/`) |
 | **HACK-018** | S4 | P1 | `AVAILABLE` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/`) |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
+| **HACK-020** | S4 | P0 | `AVAILABLE` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
 
 ---
 
@@ -749,41 +750,103 @@
 - **Revisor (2026-10-20): APPROVED.** `pytest -q tests/test_sculptor.py` = 6 passed, exit 0. Verificado sobre el CSV real (5447 filas): recta de diestro mediano (131 pares, p25-p75 97.88-100.06, mejor pitcher_00622 100.80, delta +5.80 con usuario 95.0), perfil extremo (n_peers 0, `INSUFFICIENT_PEERS`, sin cifras) y zurdo Slider (35 pares, p25-p75 100.78-103.09). Cada fila/ID/cifra existe literalmente en el CSV y pasa los filtros; percentiles, medianas y conteos recomputados coinciden. `n_peers` cuenta pitchers distintos (correcto); la exencion de la palabra del nombre de modulo en el test es aceptable (ningun texto de UI/docstring la usa para describir el resultado).
 ---
 
-### `HACK-017` — Módulo VeloVision (Video $\to$ Arm Slot $\to$ Rango Stuff+ CDMX) y Validación Manual (`src/vision/pose_slot.py`)
-- **State:** `AVAILABLE`
-- **Sprint:** 3 · **Priority:** `P1` · **DependsOn:** `HACK-014`
-- **AllowedPaths:**
-  - `src/vision/__init__.py`
-  - `src/vision/pose_slot.py`
-  - `dashboard/velovision_tab.py`
-  - `analysis/validate_vision.py`
-  - `tests/test_velovision.py`
-- **Especificación e Implementación:**
-  1. En `src/vision/pose_slot.py`, implementar:
-     - `extract_release_biomechanics(video_or_frames, pitcher_throws: str = "Right", pitcher_height_ft: float = 6.0) -> dict`:
-       - Usa `mediapipe.solutions.pose` (o fallback geométrico sobre keypoints 2D si se pasa un arreglo de keypoints en tests) para localizar en la secuencia el **frame de soltura (release frame)**: el cuadro donde la velocidad angular/extensión de la muñeca lanzadora respecto al hombro alcanza su máximo frente al torso.
-       - Calcula a partir de los landmarks `(shoulder, elbow, wrist, hip, ankle)`:
-         - `arm_slot_deg`: ángulo del vector hombro$\to$muñeca respecto a la horizontal en el plano frontal, acotado a $[0^\circ, 90^\circ]$.
-         - `rel_height_est_ft` y `extension_est_ft` escalados por la altura del jugador en píxeles (`ankle` a `nose`).
-         - Imagen anotada (`annotated_frame_rgb`) con el esqueleto y el arco del ángulo dibujados.
-     - `estimate_cdmx_stuff_range(arm_slot_deg: float, pitcher_throws: str, pitch_family: str | None = None, observed_velo_mph: float | None = None) -> dict`:
-       - Filtra en `pitcher_arsenal_breakdown.csv` los lanzadores de la LMB con la misma mano y `arm_slot_deg ± 6.0°` (y si el scout proporciona `observed_velo_mph` de un radar de bolsillo, filtra además `RelSpeed ± 1.5 mph`).
-       - Devuelve la distribución condicionada honesta en CDMX: percentiles `p10`, `p25`, `p50` (mediana), `p75`, `p90` de `stuff_plus_cdmx` y `delta_stuff_cdmx`, junto con el tamaño de muestra `n_comparable_pitches`. **Jamás devuelve un número único fingiendo que midió spin rate desde el video.**
-  2. En `analysis/validate_vision.py`:
-     - Script de validación que compara el `arm_slot_deg` medido automáticamente contra una tabla de anotación manual de 2 personas (`reports/validation/vision_manual_annotations.csv`), calculando `MAE_deg`, `RMSE_deg` y correlación inter-anotador en `reports/validation/vision_validation_summary.csv`.
-  3. En `dashboard/velovision_tab.py`, pestaña para subir un `.mp4` (o elegir un clip/frame de demostración), ver el frame de release con el esqueleto biomecánico y consultar el rango P25–P75 de `Stuff+ CDMX`.
-- **Criterios de Aceptación:**
-  1. `estimate_cdmx_stuff_range` devuelve siempre un intervalo (`p25`, `p50`, `p75`) y cuando se le pasa `observed_velo_mph`, el ancho intercuartílico `p75 - p25` es menor o igual que cuando no se le pasa velocidad.
-  2. Nunca intenta emparejar un video con un `pitcher_anon_id` específico diciendo que es la misma persona.
+### `HACK-017` — VeloVision: Ficha de Prospecto desde Video (Video $\to$ Punto de Soltura $\to$ Rango Stuff+ CDMX por Familia)
+- **State:** `IN_PROGRESS` (reespecificada por el Orquestador con el usuario, 2026-10-21)
+- **Sprint:** 3 · **Priority:** `P0` (subida de P1 por decisión del usuario) · **DependsOn:** `HACK-014`
+- **Objetivo de producto:** desde un video de celular, un coach obtiene una **ficha de prospecto**: su punto de soltura y arm slot medidos **con su error**, y para cada familia de pitcheo el **rango** de Stuff+ CDMX y ΔStuff+ que tienen los lanzadores reales de la LMB con esa mecánica. Nunca da un número único, nunca dice medir spin, quiebre ni velocidad, y nunca empareja el video con un `pitcher_anon_id`.
+
+#### Decisiones de diseño (corrigen el plan original)
+1. **Mismo arm slot que el dataset.** El dataset no mide el brazo: `src/features/physical.py:190` define `arm_slot_deg = atan2(RelHeight − 4.0, |RelSide| + 0.5)` a partir del punto de soltura. VeloVision estima el **punto de soltura relativo** (altura y lado de la muñeca respecto al pie de apoyo, escalados por la estatura) y aplica **esa misma fórmula** (`arm_slot_dataset_deg`). El ángulo hombro→muñeca (`arm_angle_biomech_deg`) se reporta aparte, solo como dato biomecánico, y **no** se usa para filtrar el catálogo.
+2. **El error de medición se propaga.** La ventana de búsqueda de comparables es `±max(6°, 2·MAE_slot)`, donde `MAE_slot` sale de la validación (17-D). Mientras no exista validación se usa ±6° y la ficha lo marca como "error aún no medido".
+3. **Rangos por familia de pitcheo**, no mezclados.
+4. **Calidad antes que respuesta.** Si la puntuación de calidad es baja (landmarks poco visibles, sujeto pequeño, cuerpo cortado o vista no frontal), la app **no** da rangos y explica qué falló y cómo regrabar.
+5. **Release con confirmación humana:** detección automática del frame de soltura más confirmación o corrección manual en una barra de frames.
+6. **Los videos no entrenan nada.** MediaPipe viene preentrenado y el catálogo es 100 % LMB. Los videos solo sirven para validar y para la demo.
+
+#### Subtareas (interfaces fijas para trabajar en paralelo)
+
+**17-A · Núcleo de visión** — `src/vision/__init__.py`, `src/vision/pose_slot.py`, `tests/test_vision_core.py`. No requiere videos.
+- `extract_pose_sequence(video_path, max_seconds=6.0, target_width=640) -> PoseSequence`: lee con `opencv-python-headless`, corre MediaPipe Pose y devuelve los landmarks por frame (x, y normalizados más visibilidad), los fps y el tamaño.
+- `detect_release_frame(seq, throws: str) -> dict`: devuelve `frame_idx`, `confidence` y `candidates` (top 3). Heurística: máximo de velocidad de la muñeca lanzadora con el brazo extendido por delante del hombro.
+- `measure_release(seq, frame_idx, throws, height_ft) -> dict`: devuelve `rel_height_ft`, `rel_side_ft`, `arm_slot_dataset_deg` (fórmula del dataset), `arm_angle_biomech_deg`, `quality_score` (0–1) y `quality_issues` (lista en español). La escala sale de la estatura en píxeles (tobillo→nariz con un factor antropométrico documentado).
+- `annotate_frame(seq, frame_idx, measures) -> np.ndarray`: el frame RGB con el esqueleto, el punto de soltura y el arco del ángulo.
+- Todo funciona también con keypoints sintéticos (arreglo de entrada) para los tests: ángulos conocidos → fórmula exacta; la calidad baja cuando la visibilidad es baja.
+
+**17-B · Puente con el catálogo LMB** — `src/vision/prospect_card.py`, `tests/test_prospect_card.py`. No requiere videos.
+- `build_prospect_card(arm_slot_dataset_deg, throws, rel_height_ft=None, slot_error_deg=None, observed_velo_mph=None, min_pitchers=8) -> dict`:
+  - Filtra `reports/leaderboards/pitcher_arsenal_breakdown.csv` por la misma mano y por slot dentro de ±max(6°, 2·error). Si hay `observed_velo_mph`, filtra además por `fb_velo ± 1.5`.
+  - Por cada `pitch_id` devuelve: p10, p25, p50, p75 y p90 de `stuff_plus_cdmx` y de `delta_stuff_cdmx` (ponderados por `n_pitches`), `n_pitchers` y `n_pitches`.
+  - Familias con menos de `min_pitchers` → `status = "INSUFFICIENT_PEERS"` y sin cifras.
+  - Ordena las familias por mediana de Stuff+ CDMX ("con tu mecánica, estas familias aguantan mejor la altitud").
+  - Devuelve `window_deg`, `error_source` ("medido" / "aún no medido") y los parámetros para abrir el Sculptor.
+- Sin cifras hardcodeadas. No devuelve nunca un valor puntual de Stuff+ del prospecto.
+
+**17-C · Interfaz** — `dashboard/velovision_tab.py`, `dashboard/annotation_tab.py`, más la integración mínima en `dashboard/app.py` (solo para registrar las pestañas). Depende de las interfaces de 17-A y 17-B.
+- Pestaña **VeloVision**, con el estilo de HACK-019:
+  1. guía de captura con íconos;
+  2. subida del `.mp4`, estatura y mano;
+  3. procesamiento con barra de progreso;
+  4. barra de frames con el release sugerido y botón "Confirmar soltura";
+  5. frame anotado;
+  6. medidas con su error;
+  7. puerta de calidad;
+  8. ficha por familia (barras p25–p75 y badges de procedencia);
+  9. radar opcional que estrecha el rango;
+  10. botón "Buscar referencias factibles" que carga los parámetros en el Sculptor.
+  - Badge permanente: "Rango condicionado a lo medible en 2D; el video no mide spin, quiebre ni velocidad y no se empareja con pitchers del dataset."
+- Pestaña **Modo anotación**: carga un clip y un frame, el anotador da clic en hombro, codo, muñeca, cadera, tobillo y nariz (componente `streamlit-image-coordinates`) y se guarda en `reports/validation/vision_manual_annotations.csv` (`clip_id`, `frame_idx`, `annotator`, `landmark`, `x`, `y`). Sin datos personales: `clip_id` es un código.
+- Los videos subidos se procesan en memoria o en un temporal y no se guardan en el servidor.
+
+**17-D · Validación** — `analysis/validate_vision.py`, `reports/validation/vision_validation_summary.csv`, `tests/test_validate_vision.py`. Depende de los videos reales y de las anotaciones.
+- Concordancia entre anotadores: ICC y diferencia media en `arm_slot_dataset_deg` y en `arm_angle_biomech_deg`.
+- Visión contra humanos (promedio de los 2 anotadores): MAE, RMSE y sesgo en grados, y error del frame de release detectado contra el confirmado.
+- Presupuesto de error hasta la ventana de búsqueda (`MAE_slot` → `window_deg`).
+- N mínimo: ≥10 lanzadores y ≥30 lanzamientos; si no se alcanza, se reporta el N real.
+- Los videos viven en `data/vision_clips/` (ignorado en git) y nunca se suben.
+
+#### Criterios de Aceptación
+1. `arm_slot_dataset_deg` aplica exactamente la fórmula de `src/features/physical.py:190` (test con keypoints sintéticos).
+2. La ficha da siempre rangos por familia (p25–p50–p75), nunca un valor puntual del prospecto. Las familias con menos de `min_pitchers` pitchers salen como `INSUFFICIENT_PEERS`.
+3. La ventana usa `±max(6°, 2·MAE_slot)` y la ficha dice si el error está medido o no.
+4. Con calidad baja no se emiten rangos y se muestra el diagnóstico.
+5. El efecto del radar sobre el ancho p25–p75 se **reporta** (antes/después); no se exige que siempre lo reduzca.
+6. Validación con N real, ICC entre anotadores y MAE visión–humano en `vision_validation_summary.csv`.
+7. Ningún texto empareja un video con un `pitcher_anon_id` ni afirma medir spin, quiebre o velocidad.
+8. Rendimiento: un clip de 5 s a 640 px se procesa en < 30 s en CPU.
+
 - **Verify Command:**
   ```powershell
-  python -m pytest -q tests/test_velovision.py
+  python -m pytest -q tests/test_vision_core.py tests/test_prospect_card.py tests/test_validate_vision.py tests/test_dashboard_smoke.py
   ```
 - **Reviewer Checklist:**
-  - [ ] **CRÍTICO (Honestidad científica):** ¿La salida de `VeloVision` se reporta siempre como **rango (P25–P75)** condicionado a lo medible (arm slot + velo opcional), sin inventar lecturas de Spin Rate desde el video?
-  - [ ] ¿La validación usa anotación manual de frames y no un falso cruce con `pitcher_anon_id`?
+  - [ ] **CRÍTICO:** ¿El slot que filtra el catálogo usa la misma definición que el dataset y no el ángulo hombro→muñeca?
+  - [ ] ¿La salida es siempre un rango por familia, con la ventana ampliada por el error medido?
+  - [ ] ¿La validación usa anotación manual de 2 personas con ICC y MAE reales, sin cruce con `pitcher_anon_id`?
+  - [ ] ¿La puerta de calidad impide dar rangos con video malo?
 
 ---
+
+### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
+- **State:** `AVAILABLE`
+- **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
+- **AllowedPaths:** `requirements.txt`, `runtime.txt` o `.python-version`, `.streamlit/config.toml`, `packages.txt` (dependencias de sistema si OpenCV o MediaPipe las piden), `README.md` (sección "Cómo usar la app"), `docs/DEPLOY.md`.
+- **Especificación:**
+  1. **Plataforma:** Streamlit Community Cloud desde `main` de GitHub, con Hugging Face Spaces como respaldo si MediaPipe no instala en la primera. Basta una URL pública; no se usa Vercel.
+  2. **Dependencias:** fijar versiones exactas de `streamlit` (la misma con la que se probó el CSS, 1.66.x), `plotly`, `lightgbm`, `scikit-learn`, `pandas`, `pyarrow`, `mediapipe`, `opencv-python-headless` (en lugar de `opencv-python`) y `streamlit-image-coordinates`. Fijar la versión de Python que soporte MediaPipe.
+  3. **Contenido del despliegue:** solo `models/*.joblib` (ya versionados) y `reports/**/*.csv`. Nunca `data/`, el parquet ni los videos (AGENTS.md §3.2).
+  4. **Prueba de humo pública:** cargar las 5 pestañas y procesar un clip de prueba en VeloVision. Registrar la URL y los tiempos en `docs/DEPLOY.md`.
+- **Criterios de Aceptación:**
+  1. La URL pública abre la app en < 60 s en frío y todas las pestañas renderizan sin errores.
+  2. VeloVision procesa un clip de 5 s en el servidor público.
+  3. El repositorio desplegado no contiene datos crudos ni predicciones por pitcheo.
+- **Verify Command:**
+  ```powershell
+  python -m pytest -q tests/test_dashboard_smoke.py
+  ```
+- **Reviewer Checklist:**
+  - [ ] ¿Las versiones fijadas coinciden con las probadas localmente?
+  - [ ] ¿El despliegue excluye `data/` y cualquier archivo pitch-by-pitch?
+
 
 ### `HACK-018` — Integración Final del Dashboard, Perfil Ideal, 3 Casos de Entrevista y Paper Técnico (`docs/`)
 - **State:** `AVAILABLE`

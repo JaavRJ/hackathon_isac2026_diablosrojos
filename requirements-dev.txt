@@ -1,0 +1,12 @@
+# Entorno de desarrollo/analisis (NO se usa en el despliegue). Incluye la app + pruebas + paquetes de analysis/.
+-r requirements.txt
+pytest==9.1.1
+shap==0.54.1
+matplotlib>=3.8.0
+seaborn>=0.12.0
+kaleido>=0.2.1
+xgboost>=2.0.0
+catboost>=1.2.0
+econml>=0.14.0
+fastapi>=0.100.0
+uvicorn==0.54.0
