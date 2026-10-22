@@ -161,7 +161,7 @@ def get_sequence(data: bytes, digest: str, start_seconds: float = 0.0) -> PS.Pos
     except Exception as exc:  # video ilegible, formato raro, memoria, etc.: mensaje claro, nunca traceback
         bar.empty()
         st.markdown(C.callout("No se pudo leer el video. Prueba con otro archivo .mp4 o .mov grabado con la cámara "
-                              f"del celular. Detalle técnico: {type(exc).__name__}."), unsafe_allow_html=True)
+                              f"del celular. Detalle técnico: {type(exc).__name__}: {str(exc)[:240]}"), unsafe_allow_html=True)
         return None
     finally:
         if tmp and os.path.exists(tmp):
