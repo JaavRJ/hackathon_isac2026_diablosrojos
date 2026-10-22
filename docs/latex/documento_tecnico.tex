@@ -30,7 +30,9 @@ El reto plantea una pregunta operativa para Diablos Rojos: \emph{¿qué tan buen
   \item \textbf{Capa de decisión (actuar).} Cuatro herramientas, reunidas en una sola aplicación Streamlit, llevan esas métricas a decisiones de fichaje, de uso y de desarrollo. Se pasan datos entre sí, de modo que un mismo pitcher puede recorrerlas todas sin volver a capturarlo (Tabla~\ref{tab:componentes}).
 \end{enumerate}
 
-\begin{table}[htbp]\centering\small
+\paragraph{Por qué VeloVision.} Todo lo anterior necesita datos TrackMan, y los prospectos que más interesan en la etapa de scouting (jugadores de academia, amateurs o agentes libres que vienen de circuitos sin radar) casi nunca los tienen. VeloVision cierra ese hueco con un video de bullpen grabado de perfil: mide el slot del brazo, la variable mecánica que define a qué pitchers de la LMB se parece el prospecto, y la usa como llave de búsqueda en el mismo catálogo de arsenales que consulta el Pitch Sculptor. Así responde, con un rango y no con un punto, qué pitcheos suelen funcionar en la CDMX con esa mecánica. Con un clic, la mecánica medida pasa al Sculptor, que amplía sus tolerancias según el error del video. VeloVision no califica al prospecto: es un filtro de scouting que indica a quién vale la pena llevar a una sesión con TrackMan, donde ya entran el simulador y las métricas completas.
+
+\begin{table}[H]\centering\small
 \caption{Componentes de la capa de decisión: qué pregunta responde cada uno y cómo se conecta con los demás.}\label{tab:componentes}
 \begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
 \toprule
@@ -43,8 +45,6 @@ VeloVision & ¿Cómo evalúo a un prospecto que no tiene TrackMan? & Video de bu
 \bottomrule
 \end{tabularx}
 \end{table}
-
-\paragraph{Por qué VeloVision.} Todo lo anterior necesita datos TrackMan, y los prospectos que más interesan en la etapa de scouting (jugadores de academia, amateurs o agentes libres que vienen de circuitos sin radar) casi nunca los tienen. VeloVision cierra ese hueco con un video de bullpen grabado de perfil: mide el slot del brazo, la variable mecánica que define a qué pitchers de la LMB se parece el prospecto, y la usa como llave de búsqueda en el mismo catálogo de arsenales que consulta el Pitch Sculptor. Así responde, con un rango y no con un punto, qué pitcheos suelen funcionar en la CDMX con esa mecánica. Con un clic, la mecánica medida pasa al Sculptor, que amplía sus tolerancias según el error del video. VeloVision no califica al prospecto: es un filtro de scouting que indica a quién vale la pena llevar a una sesión con TrackMan, donde ya entran el simulador y las métricas completas.
 
 \paragraph{Flujo de uso.} Un caso típico recorre las tres capas: el leaderboard señala a un pitcher con $\Delta$ negativo; el simulador muestra qué pitcheo lo explica; el Sculptor propone qué cambiar dentro de lo que su mecánica permite. Si el candidato no tiene TrackMan, VeloVision sustituye el primer paso. Los tres casos del documento de perfil y recomendaciones siguen este flujo. El resto de este documento justifica cada capa: la física (Sección~\ref{sec:teoria}), los datos (Sección~\ref{sec:datos}), los modelos (Sección~\ref{sec:modelos}), su validación (Sección~\ref{sec:val}), la evidencia de altitud (Sección~\ref{sec:altitud}) y las herramientas con sus límites (Sección~\ref{sec:aplicacion}).
 
