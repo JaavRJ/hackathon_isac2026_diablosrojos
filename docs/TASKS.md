@@ -31,6 +31,7 @@
 | **HACK-018** | S4 | P1 | `APPROVED` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos en LaTeX: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/latex/`) |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
 | **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
+| **HACK-021** | S4 | P0 | `APPROVED` | `HACK-019, HACK-017` | Homepage "Inicio": portada de producto de Diablos AeroVision dentro de la app (`dashboard/home_tab.py`) |
 
 ---
 
@@ -980,6 +981,11 @@ Revisor independiente, 2026-10-21. No se modificó código ni el estado global d
 
 **Estado tras la re-revisión:** APROBADA. Pendiente del Orquestador cambiar el estado global.
 
+#### 17-D: validación original con 2 anotadores (confirmada por el usuario, 2026-10-21)
+Se descartó el piloto automatizado que el Orquestador había propuesto por error de interpretación: el usuario no había pedido cambiar el alcance. 17-D se hace como estaba especificado:
+- **Anotación:** 2 personas (A y B) marcan los 6 puntos en el frame de soltura de cada clip en la pestaña **Modo anotación** de la app **LOCAL** (localhost). La app pública escribe en un contenedor efímero y los clips solo existen localmente.
+- **Cálculo:** `analysis/validate_vision.py` calcula el ICC entre anotadores, el MAE, el RMSE y el sesgo de la visión contra el promedio humano (slot del dataset y ángulo biomecánico), y el error del frame de release, en `reports/validation/vision_validation_summary.csv`. Se reporta el N real.
+
 ### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
 - **State:** `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
 - **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
@@ -1159,4 +1165,35 @@ Revisor independiente, 2026-10-21. El estado no pasa a `APPROVED` hasta registra
 - **Física/modelo:** los features de Stuff+ no incluyen VertRelAngle, HorzRelAngle_norm ni túnel a 170 ms. Perturbación headless: `in_tunnel_sim_170ms`, `in_plate_side`, `in_plate_height` no cambian Stuff+ (99.8 -> 89.3 idéntico); `tunnel_sim_release` sí (99.6 -> 89.1), y está correctamente en el grupo Stuff+.
 - **Visual:** AppTest sin excepciones en las 5 pestañas; servidor propio (puerto 8503, ya apagado) sin errores de consola; sin "Choose options", "Right/Left" ni "optimizar" visibles.
 - **Observaciones no bloqueantes:** (a) en `tests/test_dashboard_design.py::test_no_hardcoded_result_figures` la lista `banned` solo cubre cifras puntuales (0.852, 0.014, 102.1, 4.50 %…): no detectaría otras cifras nuevas; el grep de esta revisión sí las cubrió. (b) Preset "Sweeper" usa el p10 global de `hb_norm` sin separar mano (HB ya está normalizado). (c) No hay sliders de VertRelAngle/HorzRelAngle_norm: solo la nota de que no alteran Stuff+. (d) Criterio 5 del plan (capturas 1440×900 y 1920×1080 revisadas por el usuario) queda a cargo del Orquestador/usuario.
+
+---
+
+### `HACK-021` — Homepage "Inicio" de Diablos AeroVision (`dashboard/home_tab.py`)
+- **State:** `APPROVED`
+- **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019, HACK-017`
+- **AllowedPaths:** `dashboard/home_tab.py`, `dashboard/app.py` (registro de la pestaña como primera y por defecto), `dashboard/components.py`, `dashboard/theme.py`, `tests/test_home.py`, `tests/test_dashboard_smoke.py`, `tests/test_dashboard_design.py`.
+- **Especificación:** portada de producto, primera pestaña. Debe explicar qué es la app y por qué es una app (y no solo un modelo), con:
+  - un hero visual;
+  - cifras ancla reales leídas de los CSV;
+  - las 5 herramientas con su pregunta de negocio y un botón que salta a cada pestaña;
+  - el flujo de uso del coach;
+  - la física en una línea;
+  - la honestidad del producto.
+  Para el fondo se usa una animación propia (SVG/CSS) y no un video de stock, porque la licencia de los previews de iStock no permite uso público.
+- **Criterios de Aceptación:**
+  1. Ninguna cifra hardcodeada.
+  2. Todo en español y sin "optimizar".
+  3. Rojo de marca solo como marca.
+  4. Los botones llevan a la pestaña correcta.
+  5. Las demás pestañas no cambian.
+  6. Carga en frío < 20 s.
+- **Verify Command:**
+  ```powershell
+  python -m pytest -q tests/test_home.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py
+  ```
+- **Revisión independiente (2026-10-21, 1.ª pasada): CHANGES_REQUESTED (bloqueantes resueltos en la re-revisión de abajo).** Verify ampliado `python -m pytest -q tests/test_home.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_velovision_ui.py` -> 80 passed, exit 0. Cifras recalculadas desde CSV y modelo, todas correctas: ρ̂ = 0.85180 (`stuff_model.joblib`, `rho_extreme_median_`) y 1 − ρ̂ = 14.82 % -> "15 % menos aire" bien redondeado; ΔStuff+ Four-Seam = −4.5228 con n = 230 278; reducción de RMSE de Pitching+ vs baseline: folds 4.31/4.44/4.60/4.43/4.71 % (media 4.50), season 4.77 %, park 4.14 % -> "4.1–4.8"; r Stuff+ = 0.741 (n = 202, en muestra 2024–25); 634 624 pitcheos, 1 135 pitchers, 2024–2026. Sin cifras hardcodeadas (grep). Navegación: en navegador real los 7 botones (5 herramientas + 2 del hero) saltan a la pestaña correcta e "Inicio" es la pestaña por defecto; sin desbordes ni encimados a 1440 y 1920; contrastes de los tokens usados >= 4.7; `prefers-reduced-motion` respetado (`home_tab.py:327-330`); sin "optimizar"; el hero está rotulado "Ilustración esquemática, no es una medición" (`home_tab.py:259`); pie de honestidad completo (`home_tab.py:190-195`). El titular "le quita movimiento" tiene respaldo en H1 (`TotalInducedBreak` negativo en las 7 formas; IVB negativo en 5 de 7). Carga en frío muy por debajo de 20 s.
+  - **Bloqueante 1 (etiquetado engañoso):** `dashboard/home_tab.py:138` rotula la tarjeta "Menos error que el baseline nulo, en holdout" sin decir de qué modelo. El 4.1–4.8 % es **solo de Pitching+** (Location+ 4.0–4.6 %); en `holdout_metrics.csv`, `target=xrv_pitcher`, **Stuff+ empata con el baseline** (mejora entre −0.01 % y +0.04 %). Como la portada gira en torno a Stuff+ y la tarjeta está junto a las de Stuff+, el lector la lee como mérito de Stuff+. Texto pedido: label = "Pitching+: menos error que el baseline nulo, en holdout"; y en `sub` (`:140`) añadir "Stuff+ solo ≈ baseline en xRV" (o equivalente calculado, no hardcodeado). Actualizar `tests/test_home.py` para exigir "Pitching+" en el label.
+  - **Bloqueante 2 (afirmación de más):** `dashboard/home_tab.py:427` ("AeroVision te dice cuánto y qué hacer") y `:428` ("entrena con evidencia"). "Qué hacer" sugiere una prescripción; la propia portada dice en Sculptor (`:171`) "no una receta causal" y VeloVision todavía no tiene error de medición validado. Texto sugerido: "AeroVision te dice cuánto pierde y qué referencias reales seguir." (o similar, sin verbo prescriptivo).
+  - **No bloqueante:** (a) `home_tab.py:126` rotula ρ̂ "en el Harp Helú" aunque es la mediana de la categoría Altitud Extrema (el pie lo aclara; mejor "ρ̂ de CDMX (mediana Altitud Extrema)"). (b) La tarjeta de r = 0.74 está en muestra (2024–25) y rotulada así; correcto, solo conviene que `:144` diga "(en muestra)" junto al valor visible. (c) ΔStuff+ pinta en `--loss` (rojo semántico, no el rojo de marca); aceptable, o usar navy si se quiere "rojo solo de marca" estricto. (d) Encabezado global, recomendación limpia solo con CSS, sin JS: envolver la fila de miga y pastillas de `render_header` (`app.py:228-235`) en `st.container(key="app_header_ctx")` y añadir en `HOME_CSS` `.stApp:has([role="tab"][aria-selected="true"]:first-of-type) .st-key-app_header_ctx{display:none}` (el wordmark se queda). Resueltos los bloqueantes 1 y 2 (cambio de texto y de test), volver a `REVIEW`.
+- **Re-revisión independiente (2026-10-21): APPROVED.** Verify `python -m pytest -q tests/test_home.py tests/test_dashboard_smoke.py tests/test_dashboard_design.py tests/test_velovision_ui.py` -> 80 passed, exit 0. Bloqueante 1 resuelto: título "Pitching+: menos error que el baseline nulo, en holdout" (`home_tab.py:145`) y aviso calculado `_stuff_note` (`:122`). Agregación del aviso: media de los 5 folds de Pitcher + Season + Park (rango −0.00 a +0.02 %, recalculado: Pitcher +0.015, Season +0.020, Park −0.004 %); es la misma agregación que usa la tarjeta de Pitching+ (4.1–4.8 %), por lo que es coherente y honesta. Mi rango anterior (−0.01 a +0.04 %) venía de mirar los 5 folds por separado; ambos dicen lo mismo (Stuff+ ≈ baseline). Bloqueante 2 resuelto: subtítulo "AeroVision te dice cuánto pierde y qué referencias reales seguir." y "encuentra referencias con datos de la LMB". En navegador real (puerto propio, ya cerrado): el titular queda en 2 líneas ("El aire del Harp Helú le quita" / "movimiento a tu pitcheo.") a 1440 y 1920, sin palabra sola ni desborde; el encabezado global está oculto solo en "Inicio" (`display:none`) y reaparece en las otras 6 pestañas (`display:flex`); ρ̂ rotulada "mediana de Altitud Extrema" y r "(en muestra)". Observación menor no bloqueante: el aviso puede mostrar "−0.00" (negativo de redondeo, Park = −0.004 %); mejor mostrar "≈ 0" o 3 decimales.
 

@@ -41,6 +41,7 @@ ICONS: dict[str, str] = {
     "bulb": '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/>',
     "home": '<path d="M3 11l9-7 9 7M5 10v10h14V10"/>',
     "layers": '<path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/>',
+    "video": '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>',
 }
 
 
@@ -663,6 +664,13 @@ def click_and_jump(callback, label: str, source: str, toast: str | None, *args) 
     if callback is not None:
         callback(*args)
     request_tab_jump(label, source, toast)
+
+
+def jump_to_tab(label: str, toast: str | None = None) -> None:
+    """``on_click`` de navegación pura (portada): pide el salto a ``label`` sin registrar contexto cargado."""
+    import streamlit as st
+
+    st.session_state[TAB_JUMP_KEY] = {"label": label, "source": "Inicio", "toast": toast, "done": False}
 
 
 def consume_tab_jump() -> None:

@@ -8,7 +8,7 @@ Interfaz 100 % en espanol. Carga solo ``models/*.joblib`` y ``reports/**/*.csv``
 relativas a la raiz); la logica pura vive en ``dashboard/ui_utils.py``, el sistema de diseno en
 ``dashboard/theme.py`` y los componentes en ``dashboard/components.py``.
 
-Vistas: (1) Simulador Nivel del Mar vs. Harp Helu, (2) Mapa de movimiento, (3) Leaderboard + tarjeta de
+Vistas: (0) Inicio (portada, HACK-021), (1) Simulador Nivel del Mar vs. Harp Helu, (2) Mapa de movimiento, (3) Leaderboard + tarjeta de
 lanzador, (4) Pitch Sculptor (modulo externo opcional), (5) VeloVision, (6) Modo anotación.
 
 Estado (``st.session_state``, segun docs/DISENO_UI_NIELSEN.md 3.3): ``active_pitch_params``,
@@ -31,6 +31,7 @@ from dashboard import theme
 from dashboard import ui_utils as ui
 
 from dashboard.annotation_tab import render_annotation_tab
+from dashboard.home_tab import render_home_tab
 from dashboard.leaderboard_tab import render_leaderboard
 from dashboard.velovision_tab import apply_velovision_override, render_velovision_tab
 
@@ -226,12 +227,14 @@ def render_header(meta: dict) -> None:
     pitch = st.session_state.get("in_pitch_id", "Four-Seam")
     crumb = C.breadcrumb([name, hand, pitch], source=SOURCE_LABELS.get(mode, mode),
                          env=f"Harp Helú (ρ̂ {meta['rho_cdmx']:.3f})")
-    c1, c2, c3, c4 = st.columns([4.2, 4.2, 1.5, 1.5], vertical_alignment="center")
-    c1.markdown(crumb, unsafe_allow_html=True)
-    c2.markdown(C.anchors_row(get_anchors()), unsafe_allow_html=True)
-    c3.markdown(f'<div style="text-align:right">{C.pill("2026 fuera de muestra")}</div>', unsafe_allow_html=True)
-    c4.button("↶ Revertir cambios", key="btn_revert", on_click=_on_revert, width="stretch",
-              disabled=(mode != "MANUAL_EDIT" or not st.session_state.get("_base_inputs")))
+    # el CSS de la portada oculta este contexto (miga + pastillas) solo cuando la pestaña activa es "Inicio"
+    with st.container(key="app_header_ctx"):
+        c1, c2, c3, c4 = st.columns([4.2, 4.2, 1.5, 1.5], vertical_alignment="center")
+        c1.markdown(crumb, unsafe_allow_html=True)
+        c2.markdown(C.anchors_row(get_anchors()), unsafe_allow_html=True)
+        c3.markdown(f'<div style="text-align:right">{C.pill("2026 fuera de muestra")}</div>', unsafe_allow_html=True)
+        c4.button("↶ Revertir cambios", key="btn_revert", on_click=_on_revert, width="stretch",
+                  disabled=(mode != "MANUAL_EDIT" or not st.session_state.get("_base_inputs")))
 
 
 # ----------------------------------------------------------------------------
@@ -537,25 +540,27 @@ def main() -> None:
     _init_state()
     render_header(meta)
 
-    tabs = st.tabs(["Simulador", "Mapa de movimiento", "Leaderboard", "Sculptor", "VeloVision", "Modo anotación"])
+    tabs = st.tabs(["Inicio", "Simulador", "Mapa de movimiento", "Leaderboard", "Sculptor", "VeloVision", "Modo anotación"])
     C.consume_tab_jump()      # salto one-shot pedido por un botón "Llevar a…" (ver components.switch_to_tab)
     with tabs[0]:
+        render_home_tab(reports, meta)
+    with tabs[1]:
         C.context_pill("Simulador", active=st.session_state.get("source_mode") == "REAL_PITCHER")
         render_simulator(reports, meta)
-    with tabs[1]:
-        render_movement_map(reports)
     with tabs[2]:
+        render_movement_map(reports)
+    with tabs[3]:
         render_leaderboard(reports, meta, _on_load_pitcher)
-    with tabs[4], st.container(key="zoom_velovision"):
+    with tabs[5], st.container(key="zoom_velovision"):
         render_velovision_tab()
-    with tabs[3], st.container(key="zoom_sculptor"):
+    with tabs[4], st.container(key="zoom_sculptor"):
         # VeloVision (arriba) pudo cargar una mecánica medida; se reaplica tras el Simulador, que reescribe el estado
         apply_velovision_override()
         if render_sculptor_tab is None:
             st.info("Pestaña en construcción.")
         else:
             render_sculptor_tab({"arsenal": reports["arsenal"], "meta": meta, "load_cb": _on_load_pitcher})
-    with tabs[5], st.container(key="zoom_annotation"):
+    with tabs[6], st.container(key="zoom_annotation"):
         render_annotation_tab()
 
 

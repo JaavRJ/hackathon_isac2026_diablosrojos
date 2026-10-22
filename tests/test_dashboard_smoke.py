@@ -237,7 +237,7 @@ def test_app_runs_headless_in_spanish(bundle, capsys):
     at = AppTest.from_file(str(APP_PATH), default_timeout=120).run()
     run_s = time.perf_counter() - t0
     assert not at.exception, [e.value for e in at.exception]
-    assert [t.label for t in at.tabs][:3] == ["Simulador", "Mapa de movimiento", "Leaderboard"]
+    assert [t.label for t in at.tabs][:4] == ["Inicio", "Simulador", "Mapa de movimiento", "Leaderboard"]
 
     shown = " ".join(" ".join(map(str, df.value["Término"])) for df in at.dataframe if "Término" in df.value.columns)
     for label in ("Canal Stuff", "Canal Parque (BIP)", "Residuo no atribuido (no se atribuye a ningún canal)"):
