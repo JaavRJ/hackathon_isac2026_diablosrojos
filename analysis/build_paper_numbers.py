@@ -454,11 +454,47 @@ def build(out_dir: Path = OUT) -> dict[str, str]:
     c["sc.relh.tol"] = num(res["filters"]["rel_height_tol_ft"], 2)
     c["sc.velo.tol"] = num(res["filters"]["fb_velo_tol_mph"], 0)
 
+    _velovision_macros(c)
+
     files["cifras.tex"] = c.tex()
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, text in files.items():
         (out_dir / name).write_text(text, encoding="utf-8")
     return files
+
+
+def _velovision_macros(c: "Cifras") -> None:
+    """Cifras de la validacion piloto de VeloVision (17-D). Sin CSV: 'no disponible', sin tronar."""
+    keys = ["vv.n", "vv.icc", "vv.mae.ann", "vv.mae.ann.n", "vv.mae.det", "vv.mae.det.n", "vv.rel.ms",
+            "vv.window"]
+    path = REPORTS / "validation" / "vision_validation_summary.csv"
+    vals: dict[str, str] = {}
+    if path.is_file():
+        try:
+            df = pd.read_csv(path)
+
+            def get(metric: str, measure: str) -> tuple[float, int] | None:
+                r = df[(df.metric == metric) & (df.measure == measure)]
+                if r.empty or pd.isna(r.iloc[0]["value"]):
+                    return None
+                return float(r.iloc[0]["value"]), int(r.iloc[0]["n"])
+
+            slot = "arm_slot_dataset_deg"
+            spec = {"vv.n": ("n_both_annotators", "all", 0), "vv.icc": ("icc_2_1", slot, 3),
+                    "vv.mae.ann": ("mae_vs_human_mean", slot, 1),
+                    "vv.mae.det": ("mae_vs_human_mean_detected_frame", slot, 1),
+                    "vv.rel.ms": ("release_frame_mae_ms", "release_frame", 0),
+                    "vv.window": ("recommended_combined_slot_error_deg", slot, 0)}
+            for key, (metric, measure, nd) in spec.items():
+                got = get(metric, measure)
+                if got:
+                    vals[key] = ("> 0.999" if key == "vv.icc" and got[0] >= 0.9995 else num(got[0], nd))
+                    if key in ("vv.mae.ann", "vv.mae.det"):
+                        vals[key + ".n"] = str(got[1])
+        except Exception:  # CSV malformado: se degrada igual que si no existiera
+            vals = {}
+    for k in keys:
+        c[k] = vals.get(k, "no disponible")
 
 
 def build_figures(out_dir: Path = OUT) -> list[Path]:

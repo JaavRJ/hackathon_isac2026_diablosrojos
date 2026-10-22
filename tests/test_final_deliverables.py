@@ -61,6 +61,26 @@ def test_no_literal_numbers_outside_generated_macros():
         assert not extra, f"{name} contiene números escritos a mano: {extra}"
 
 
+VV_KEYS = ["vv.n", "vv.icc", "vv.mae.ann", "vv.mae.ann.n", "vv.mae.det", "vv.mae.det.n", "vv.rel.ms",
+           "vv.window"]
+
+
+def test_velovision_macros_exist_and_are_used_not_hardcoded():
+    assert set(VV_KEYS) <= _defined_keys()
+    used = (LATEX / "documento_tecnico.tex").read_text(encoding="utf-8")
+    for k in ("vv.n", "vv.icc", "vv.mae.ann", "vv.mae.det", "vv.rel.ms", "vv.window"):
+        assert "\\cf{" + k + "}" in used, f"documento_tecnico.tex no usa cf{{{k}}}"
+    summ = ROOT / "reports" / "validation" / "vision_validation_summary.csv"
+    if summ.is_file():
+        df = pd.read_csv(summ)
+        body = re.sub(r"(?<!\\)%.*", "", used + (LATEX / "perfil_recomendaciones.tex").read_text(encoding="utf-8"))
+        for v in df["value"].dropna().abs():
+            for nd in (1, 2, 3):
+                lit = f"{v:.{nd}f}"
+                if len(lit) >= 4:
+                    assert not re.search(r"(?<![\d.])" + re.escape(lit) + r"(?!\d)", body), f"cifra de VeloVision escrita a mano: {lit}"
+
+
 def test_generated_files_match_reports(tmp_path):
     fresh = build(out_dir=tmp_path)
     for fname, content in fresh.items():
