@@ -203,7 +203,7 @@ HONESTY: list[tuple[str, str]] = [
     ("clock", "La temporada 2026 está fuera de muestra: no entrenó ningún modelo."),
 ]
 
-CREDITS = "Diablos Rojos del México · Hackathon ISAC 2026 · Reto 2"
+CREDITS = "Diablos Rojos del México · Hackathon ISAC 2026 · Reto 2 · Equipo Noba"
 
 
 # ----------------------------------------------------------------------------

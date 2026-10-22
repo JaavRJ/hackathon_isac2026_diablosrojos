@@ -201,4 +201,4 @@ Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las libr
 
 ## 12. Créditos
 
-Proyecto del equipo para el **Hackathon ISAC 2026**, **Reto 2 · Diablos Rojos del México** (*Stuff Plus Model: calidad de pitcheo ajustada por entorno*). Datos TrackMan de la LMB proporcionados por los organizadores; no se redistribuyen. VeloVision usa MediaPipe Pose Landmarker.
+Proyecto del **Equipo Noba** (Reyna Juárez Javier; Ochoa Alva Nadia Paola) para el **Hackathon ISAC 2026**, **Reto 2 · Diablos Rojos del México** (*Stuff Plus Model: calidad de pitcheo ajustada por entorno*). Datos TrackMan de la LMB proporcionados por los organizadores; no se redistribuyen. VeloVision usa MediaPipe Pose Landmarker.

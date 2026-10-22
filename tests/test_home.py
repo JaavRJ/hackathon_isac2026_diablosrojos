@@ -57,6 +57,7 @@ def test_home_renders_without_exceptions():
     html = " ".join(m.value for m in at.markdown)
     assert "Harp Helú" in html and "AeroVision te dice cuánto pierde y qué referencias reales seguir" in html
     assert "Diablos Rojos del México · Hackathon ISAC 2026 · Reto 2" in html
+    assert "Noba" in html
 
 
 def test_home_is_first_and_default_tab():
