@@ -64,6 +64,12 @@ def pval(p: float) -> str:
     return r"\ensuremath{<}0.01" if p < 0.01 else num(p, 2)
 
 
+def sci(x: float, nd: int = 2) -> str:
+    """Notacion cientifica tipografica: 2.84e-05 -> $2.84\\times10^{-5}$."""
+    mant, exp = f"{x:.{nd}e}".split("e")
+    return rf"${mant}\times10^{{{int(exp)}}}$"
+
+
 def ci(lo: float, hi: float, nd: int = 2, scale: float = 1.0) -> str:
     return f"[{num(scale * lo, nd)}, {num(scale * hi, nd)}]"
 
@@ -307,8 +313,8 @@ def build(out_dir: Path = OUT) -> dict[str, str]:
         for pred, pk in [("SpinRate", "spin"), ("SpinToBreakRatio", "s2b"), ("InducedVertBreak", "ivb"),
                          ("HorzBreak_norm", "hb")]:
             r = hy.loc[f"H4:joint_extreme:{tgt}:{pred}"]
-            rows.append([tgt.replace("_", r"\_"), pred.replace("_", r"\_"), f"{r.estimate:.2e}",
-                         f"[{r.ci_low:.2e}, {r.ci_high:.2e}]", pval(r.p_value)])
+            rows.append([tgt.replace("_", r"\_"), pred.replace("_", r"\_"), sci(r.estimate),
+                         f"[{sci(r.ci_low)}, {sci(r.ci_high)}]", pval(r.p_value)])
             c[f"h4.{tk}.{pk}.p"] = pval(r.p_value)
             c[f"h4.{tk}.{pk}.prel"] = (r"\ensuremath{<}0.01" if r.p_value < 0.01 else "=" + num(r.p_value, 2))
             c[f"h4.{tk}.{pk}.per100"] = num(100 * r.estimate, 4)
@@ -325,7 +331,11 @@ def build(out_dir: Path = OUT) -> dict[str, str]:
     c["canal.n"] = str(int(ch.loc["total", "n_pitchers"]))
     c["riesgo.hr.suben"] = str(int(sum(shape(p, "home_run").estimate > 0 for p in PITCH_ORDER)))
     c["riesgo.hr.familias"] = str(len(PITCH_ORDER))
-    c["riesgo.hr.signif"] = str(int(sum(shape(p, "home_run").p_value < 0.05 for p in PITCH_ORDER)))
+    n_sig = int(sum(shape(p, "home_run").p_value < 0.05 for p in PITCH_ORDER))
+    c["riesgo.hr.signif"] = str(n_sig)
+    c["riesgo.hr.signif.txt"] = ("ninguna diferencia es significativa" if n_sig == 0 else
+                                 f"{n_sig} diferencia es significativa" if n_sig == 1 else
+                                 f"{n_sig} diferencias son significativas")
     c["canal.ratio"] = num(ch.loc["park", "estimate"] / ch.loc["stuff", "estimate"], 1)
 
     # ---------------- Contrafactual de Stuff+ por familia (arsenal) ----------------

@@ -1,5 +1,8 @@
 \documentclass[10pt]{article}
 \input{preambulo.tex}
+% Espaciado de flotantes algo más compacto para que el cierre no quede solo en una página.
+\setlength{\textfloatsep}{10pt plus 2pt minus 4pt}
+\setlength{\floatsep}{8pt plus 2pt minus 2pt}
 
 \title{\textbf{Diablos AeroVision}\\[4pt]
 \large Calidad de pitcheo ajustada por entorno en la LMB:\\ \splus, \lplus\ y \pplus\ a nivel del mar y en el Harp Helú}
@@ -122,7 +125,7 @@ En resumen, \splus\ es un \textbf{descriptor estable de la calidad física} del 
 
 Todas las comparaciones son \textbf{dentro del mismo pitcher}: para cada pitcher, temporada y \texttt{pitch\_id} que lanzó tanto en \emph{No} como en \emph{Extreme Altitude}, restamos las medias y luego promediamos las diferencias entre pitchers. Los intervalos de confianza salen de un bootstrap por pitcher de 1{,}000 réplicas, para no tratar como independientes los lanzamientos de un mismo pitcher.
 
-\paragraph{H1, movimiento aerodinámico: confirmada para las rectas, parcial en el resto.} Todas las familias pierden quiebre total en altitud (Tabla~\ref{tab:h1}), y las rectas están entre las que más pierden, como predice H1. Pero H1 es diferencial y no se cumple en todo su enunciado: el slider, que vive del giro, es el más resistente, y el cambio pierde casi tanto como la recta. Las que más pierden son el sinker (\cf{h1.sinker.tib}~in), la recta de cuatro costuras (\cf{h1.fourseam.tib}~in) y el cambio (\cf{h1.changeup.tib}~in); el slider es el más resistente (\cf{h1.slider.tib}~in). El efecto compensatorio también aparece: la recta llega \cf{h1.fourseam.zs}~mph más rápido. El splitter es el único caso sin evidencia sólida en IVB ($p=\cf{h1.splitter.ivbp}$, $n=\cf{h1.splitter.n}$ pitchers).
+\paragraph{H1, movimiento aerodinámico: confirmada para las rectas, parcial en el resto.} Todas las familias pierden quiebre total en altitud (Tabla~\ref{tab:h1}). Las que más pierden son el sinker (\cf{h1.sinker.tib}~in), la recta de cuatro costuras (\cf{h1.fourseam.tib}~in) y el cambio (\cf{h1.changeup.tib}~in): las rectas están entre las más afectadas, como predice H1. Pero H1 es diferencial y no se cumple en todo su enunciado: el cambio pierde casi tanto como la recta y el slider, que vive del giro, es el más resistente (\cf{h1.slider.tib}~in). El efecto compensatorio también aparece: la recta llega \cf{h1.fourseam.zs}~mph más rápido. El splitter es el único caso sin evidencia sólida en IVB ($p=\cf{h1.splitter.ivbp}$, $n=\cf{h1.splitter.n}$ pitchers).
 
 \begin{table}[htbp]\centering\small
 \caption{H1: diferencia \emph{Extreme} $-$ \emph{No Altitude} dentro de cada pitcher. IVB y HB en pulgadas; todas con $p<0.01$ salvo el IVB y la ZoneSpeed del splitter.}\label{tab:h1}
@@ -179,7 +182,7 @@ En un piloto con 2 anotadores ($n=\cf{vv.n}$ lanzamientos) el acuerdo entre huma
   \item H3 y H4 no se confirman, H1 se confirma solo para las rectas y H2 solo en el contrafactual del modelo.
   \item No hay orientación de costura, así que la estela desplazada por la costura no es modelable. Tampoco hay corredores en base, así que el valor en carreras usa outs $\times$ conteo.
   \item Las comparaciones dentro del mismo pitcher controlan la identidad del pitcher, pero no la selección del rival ni del bateador en cada parque.
-  \item VeloVision es experimental. Sus orígenes son aproximados a TrackMan y el sesgo sistemático, aunque declarado y propagado, no está medido contra TrackMan; la validación con anotadores humanos no lo detecta porque ambos miden en el mismo video. El piloto tiene $n=\cf{vv.n}$ lanzamientos, así que sus errores indican un orden de magnitud y no una precisión. Las fichas son rangos de referencia por familia, no el nivel del prospecto.
+  \item VeloVision es experimental: su sesgo frente a TrackMan está declarado pero no medido, el piloto tiene $n=\cf{vv.n}$ lanzamientos y sus fichas son rangos de referencia, no el nivel del prospecto.
   \item Los IDs son anónimos y no hay equipo en los datos, así que no podemos identificar el staff de Diablos. Las recomendaciones se expresan por perfil.
 \end{itemize}
 
