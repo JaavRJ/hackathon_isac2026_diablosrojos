@@ -6,7 +6,7 @@
 
 \title{\textbf{Diablos AeroVision}\\[4pt]
 \large Calidad de pitcheo ajustada por entorno en la LMB:\\ \splus, \lplus\ y \pplus\ a nivel del mar y en el Harp Helú}
-\author{Equipo Noba: Reyna Juárez Javier · Ochoa Alva Nadia Paola\\Documento técnico · Reto 2 Diablos Rojos · ISAC Sports Analytics Hackathon 2026}
+\author{Equipo Noba: Reyna Juárez Javier · Ochoa Alva Nadia Paola\\Documento técnico y anexo\\Reto 2 Diablos Rojos · ISAC Sports Analytics Hackathon 2026}
 \date{22 de octubre de 2026}
 
 \begin{document}
@@ -46,7 +46,7 @@ VeloVision & ¿Cómo evalúo a un prospecto que no tiene TrackMan? & Video de bu
 \end{tabularx}
 \end{table}
 
-\paragraph{Flujo de uso.} Un caso típico recorre las tres capas: el leaderboard señala a un pitcher con $\Delta$ negativo; el simulador muestra qué pitcheo lo explica; el Sculptor propone qué cambiar dentro de lo que su mecánica permite. Si el candidato no tiene TrackMan, VeloVision sustituye el primer paso. Los tres casos del documento de perfil y recomendaciones siguen este flujo. El resto de este documento justifica cada capa: la física (Sección~\ref{sec:teoria}), los datos (Sección~\ref{sec:datos}), los modelos (Sección~\ref{sec:modelos}), su validación (Sección~\ref{sec:val}), la evidencia de altitud (Sección~\ref{sec:altitud}) y las herramientas con sus límites (Sección~\ref{sec:aplicacion}).
+\paragraph{Flujo de uso.} Un caso típico recorre las tres capas: el leaderboard señala a un pitcher con $\Delta$ negativo; el simulador muestra qué pitcheo lo explica; el Sculptor propone qué cambiar dentro de lo que su mecánica permite. Si el candidato no tiene TrackMan, VeloVision sustituye el primer paso. Los tres casos del Anexo~A (perfil y recomendaciones) siguen este flujo. El resto de este documento justifica cada capa: la física (Sección~\ref{sec:teoria}), los datos (Sección~\ref{sec:datos}), los modelos (Sección~\ref{sec:modelos}), su validación (Sección~\ref{sec:val}), la evidencia de altitud (Sección~\ref{sec:altitud}) y las herramientas con sus límites (Sección~\ref{sec:aplicacion}).
 
 %=====================================================================
 \section{Marco teórico: por qué la altitud cambia el pitcheo}
@@ -221,5 +221,16 @@ En un piloto con 2 anotadores ($n=\cf{vv.n}$ lanzamientos) el acuerdo entre huma
 \end{itemize}
 
 \paragraph{Reproducibilidad.} Todo el pipeline es determinista y está cubierto por pruebas automáticas. Todas las cifras de este documento se generan desde \texttt{reports/} con \texttt{analysis/build\_paper\_numbers.py}; ningún número está escrito a mano.
+
+\label{fin:cuerpo}
+\clearpage
+\appendix
+\renewcommand{\thesection}{A}
+\setcounter{section}{1}
+\section*{Anexo A \textemdash{} Perfil físico ideal y recomendaciones\\ operativas (Entregables 2 y 3)}
+\addcontentsline{toc}{section}{Anexo A \textemdash{} Perfil físico ideal y recomendaciones operativas}
+\noindent\emph{El cuerpo del documento técnico (Entregable 5) ocupa las páginas 1--\pageref{fin:cuerpo}; este anexo contiene los Entregables 2 y 3 de las bases.}
+
+\input{anexo_perfil.tex}
 
 \end{document}

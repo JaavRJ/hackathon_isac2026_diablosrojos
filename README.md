@@ -163,7 +163,7 @@ Las corridas de validación y de hipótesis son pesadas (minutos a horas según 
 
 ## 8. Compilar el paper
 
-Las instrucciones están en [docs/latex/README.md](docs/latex/README.md): `pdflatex` dos veces sobre `documento_tecnico.tex` y `perfil_recomendaciones.tex`, o subir `docs/latex/` a Overleaf. Las cifras salen de `docs/latex/generated/`; no se editan a mano.
+Las instrucciones están en [docs/latex/README.md](docs/latex/README.md): `pdflatex` tres veces sobre `documento_tecnico.tex` (un solo PDF: documento técnico más el Anexo A con el perfil y las recomendaciones, `anexo_perfil.tex`), o subir `docs/latex/` a Overleaf. Las cifras salen de `docs/latex/generated/`; no se editan a mano.
 
 ## 9. Despliegue
 

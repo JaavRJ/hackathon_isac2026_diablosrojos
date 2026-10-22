@@ -19,7 +19,7 @@ from analysis.build_paper_numbers import build
 ROOT = Path(__file__).resolve().parents[1]
 LATEX = ROOT / "docs" / "latex"
 GENERATED = LATEX / "generated"
-DOCS = ["documento_tecnico.tex", "perfil_recomendaciones.tex"]
+DOCS = ["documento_tecnico.tex", "anexo_perfil.tex"]
 PENDING = re.compile(r"\[(?:TODO|por verificar|ejemplo)\]", re.IGNORECASE)
 
 
@@ -61,6 +61,41 @@ def test_no_literal_numbers_outside_generated_macros():
         assert not extra, f"{name} contiene números escritos a mano: {extra}"
 
 
+def _pdf_pages(pdf: Path) -> int:
+    return len(re.findall(rb"/Type\s*/Page[^s]", pdf.read_bytes()))
+
+
+def test_single_pdf_with_annex():
+    """Un solo PDF: cuerpo del documento tecnico (6-10 pags.) y anexo con los Entregables 2 y 3."""
+    pdfs = sorted(p.name for p in LATEX.glob("*.pdf"))
+    assert pdfs == ["documento_tecnico.pdf"], f"debe existir un solo PDF en docs/latex: {pdfs}"
+    assert not (LATEX / "perfil_recomendaciones.tex").exists()
+    main = (LATEX / "documento_tecnico.tex").read_text(encoding="utf-8")
+    assert r"\appendix" in main and r"\input{anexo_perfil.tex}" in main
+    assert r"\label{fin:cuerpo}" in main and r"\pageref{fin:cuerpo}" in main
+    assert main.index(r"\label{fin:cuerpo}") < main.index(r"\appendix") < main.index(r"\input{anexo_perfil.tex}")
+    assert "Entregables 2 y 3" in main
+    aux = LATEX / "documento_tecnico.aux"
+    if aux.is_file():  # el .aux es local (gitignored); si esta, valida el rango del cuerpo
+        m = re.search(r"\\newlabel\{fin:cuerpo\}\{\{[^}]*\}\{(\d+)\}", aux.read_text(encoding="utf-8"))
+        assert m, "falta la etiqueta fin:cuerpo en el .aux; recompila el documento"
+        body_pages = int(m.group(1))
+        assert 6 <= body_pages <= 10, f"el cuerpo ocupa {body_pages} paginas (limite 6-10)"
+        assert _pdf_pages(LATEX / "documento_tecnico.pdf") > body_pages, "el anexo no aparece en el PDF"
+
+
+def test_no_label_collisions_between_body_and_annex():
+    labels = {}
+    for name in DOCS:
+        text = (LATEX / name).read_text(encoding="utf-8")
+        for lab in re.findall(r"\\label\{([^}]+)\}", text):
+            assert lab not in labels, f"etiqueta duplicada {lab!r} en {name} y {labels[lab]}"
+            labels[lab] = name
+    annex = (LATEX / "anexo_perfil.tex").read_text(encoding="utf-8")
+    undefined = {r for r in re.findall(r"\\ref\{([^}]+)\}", annex)} - set(labels)
+    assert not undefined, f"referencias sin etiqueta en el anexo: {sorted(undefined)}"
+
+
 VV_KEYS = ["vv.n", "vv.icc", "vv.mae.ann", "vv.mae.ann.n", "vv.mae.det", "vv.mae.det.n", "vv.rel.ms",
            "vv.window"]
 
@@ -73,7 +108,7 @@ def test_velovision_macros_exist_and_are_used_not_hardcoded():
     summ = ROOT / "reports" / "validation" / "vision_validation_summary.csv"
     if summ.is_file():
         df = pd.read_csv(summ)
-        body = re.sub(r"(?<!\\)%.*", "", used + (LATEX / "perfil_recomendaciones.tex").read_text(encoding="utf-8"))
+        body = re.sub(r"(?<!\\)%.*", "", used + (LATEX / "anexo_perfil.tex").read_text(encoding="utf-8"))
         for v in df["value"].dropna().abs():
             for nd in (1, 2, 3):
                 lit = f"{v:.{nd}f}"
