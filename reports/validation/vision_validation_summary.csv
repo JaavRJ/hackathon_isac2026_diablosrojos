@@ -1,0 +1,26 @@
+metric,measure,value,n,note
+n_both_annotators,all,4.0,4,"lanzamientos (clip, frame) anotados por A y B"
+n_one_annotator,all,0.0,0,lanzamientos anotados por uno solo; no entran a las metricas
+n_omitted_clips,all,0.0,0,clip_id sin archivo local o sin codigo valido
+icc_2_1,arm_slot_dataset_deg,0.9970228588230405,4,
+mean_diff_A_minus_B,arm_slot_dataset_deg,-0.18683548582671672,4,
+mae_vs_human_mean,arm_slot_dataset_deg,12.226522995350328,3,vision en frame anotado contra promedio de A y B
+rmse_vs_human_mean,arm_slot_dataset_deg,14.215901747466235,3,vision en frame anotado contra promedio de A y B
+bias_vs_human_mean,arm_slot_dataset_deg,-0.9838117123767253,3,vision en frame anotado contra promedio de A y B
+mae_vs_human_mean_detected_frame,arm_slot_dataset_deg,6.370459204513381,4,vision en frame detectado por el sistema contra promedio de A y B
+rmse_vs_human_mean_detected_frame,arm_slot_dataset_deg,9.191588440081503,4,vision en frame detectado por el sistema contra promedio de A y B
+bias_vs_human_mean_detected_frame,arm_slot_dataset_deg,-4.986820873660257,4,vision en frame detectado por el sistema contra promedio de A y B
+icc_2_1,arm_angle_biomech_deg,0.9986351303697824,4,
+mean_diff_A_minus_B,arm_angle_biomech_deg,1.9100619806181598,4,
+mae_vs_human_mean,arm_angle_biomech_deg,6.581736408467836,3,vision en frame anotado contra promedio de A y B
+rmse_vs_human_mean,arm_angle_biomech_deg,7.332236619612019,3,vision en frame anotado contra promedio de A y B
+bias_vs_human_mean,arm_angle_biomech_deg,-6.581736408467836,3,vision en frame anotado contra promedio de A y B
+mae_vs_human_mean_detected_frame,arm_angle_biomech_deg,25.191650876910906,4,vision en frame detectado por el sistema contra promedio de A y B
+rmse_vs_human_mean_detected_frame,arm_angle_biomech_deg,29.119254796972424,4,vision en frame detectado por el sistema contra promedio de A y B
+bias_vs_human_mean_detected_frame,arm_angle_biomech_deg,21.08803034671336,4,vision en frame detectado por el sistema contra promedio de A y B
+release_frame_mean_error_frames,release_frame,5.0,4,"detectado - anotado (el anotado es el de A, o de B si A no esta; comun en ambos por emparejar clip y frame)"
+release_frame_mae_frames,release_frame,5.0,4,
+release_frame_mean_error_ms,release_frame,177.2,4,"detectado - anotado (el anotado es el de A, o de B si A no esta; comun en ambos por emparejar clip y frame)"
+release_frame_mae_ms,release_frame,177.2,4,
+recommended_combined_slot_error_deg,arm_slot_dataset_deg,14.655213834833521,3,sqrt(MAE_slot^2 + sys^2) con MAE_slot=12.23 deg y sys tipico (mediana)=8.08 deg
+systematic_error_vs_trackman,all,,0,"no medido: AGENTS.md 2.6; ambos anotadores comparten el sesgo de origen del video, asi que este MAE no lo detecta"

@@ -57,6 +57,12 @@ def _synthetic_seq(vis=1.0, n=40):
     return PS.PoseSequence.from_keypoints(kp, fps=30.0, width=W, height=H)
 
 
+@pytest.fixture(autouse=True)
+def _no_validation_csv(monkeypatch, tmp_path):
+    """Por defecto las pruebas no leen el CSV real de validación (cada prueba que lo necesita lo inyecta)."""
+    monkeypatch.setattr(VT, "VALIDATION_CSV", tmp_path / "sin_validacion.csv")
+
+
 def _app():
     from dashboard import theme
     from dashboard.velovision_tab import render_velovision_tab
@@ -488,3 +494,49 @@ def test_leaderboard_and_sculptor_load_buttons_use_the_jump_helper():
     for mod in (leaderboard_tab, sculptor_tab):
         assert "click_and_jump" in inspect.getsource(mod)
     assert "consume_tab_jump" in (ROOT / "dashboard" / "app.py").read_text(encoding="utf-8")
+
+
+# ----------------------------------------------------------------------------
+# 17-D: error de medición validado en la ficha
+# ----------------------------------------------------------------------------
+SYN_CSV = """metric,measure,value,n,note
+mae_vs_human_mean,arm_slot_dataset_deg,9.37,5,x
+mae_vs_human_mean,arm_angle_biomech_deg,4.21,5,x
+release_frame_mae_ms,release_frame,123.4,6,
+"""
+
+
+def test_card_shows_combined_error_from_csv(fake_clip, monkeypatch, tmp_path):
+    csv = tmp_path / "val.csv"
+    csv.write_text(SYN_CSV, encoding="utf-8")
+    monkeypatch.setattr(VT, "VALIDATION_CSV", csv)
+    err, kind = VT.slot_error_for({"slot_sys_err_deg": 3.0})
+    assert kind == VT.KIND_BOTH and abs(err - (9.37 ** 2 + 3.0 ** 2) ** 0.5) < 1e-9
+    _inject(monkeypatch, _synthetic_seq())
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    txt = _text(at)
+    assert "error de medición en piloto: MAE 9.4° (n=5)" in txt
+    assert "error de medición en piloto: MAE 4.2° (n=5)" in txt
+    assert "no validado contra humanos" in txt
+    at.button(key="vv_confirm").click().run()
+    assert not at.exception, [e.value for e in at.exception]
+    txt = _text(at)
+    assert "combinado" in txt and "MAE 9.4°, n=5 lanzamientos, 2 anotadores" in txt
+    assert "~123 ms" in txt and "confirma el frame en la barra" in txt
+
+
+def test_card_without_csv_keeps_pending_text(fake_clip, monkeypatch):
+    _inject(monkeypatch, _synthetic_seq())
+    at = AppTest.from_function(_app, default_timeout=120).run()
+    _open_clip(at)
+    at.button(key="vv_confirm").click().run()
+    txt = _text(at)
+    assert "aún no medido" in txt and "combinado" not in txt and "confirma el frame" not in txt
+    assert VT.slot_error_for({"slot_sys_err_deg": 3.0}) == (3.0, VT.KIND_SYS)
+
+
+def test_no_validation_numbers_hardcoded_in_tab():
+    src = Path(VT.__file__).read_text(encoding="utf-8")
+    for num in ("12.23", "14.66", "177"):
+        assert num not in src

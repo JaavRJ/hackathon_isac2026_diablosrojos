@@ -38,6 +38,9 @@ HAND_NAMES = {v: k for k, v in HAND_LABELS.items()}
 FT_RANGE = (4.0, 7.5)                            # mismo rango que valida measure_release
 CM_PER_FT = 30.48
 ERR_PENDING = "error de medición aún no medido (pendiente de validación)"
+VALIDATION_CSV = ROOT / "reports" / "validation" / "vision_validation_summary.csv"   # 17-D (piloto, 2 anotadores)
+SLOT_MEASURE = "arm_slot_dataset_deg"
+BIOMECH_MEASURE = "arm_angle_biomech_deg"
 
 GUIDE = [
     ("camera", "Cámara de frente", "Detrás del home o desde el jardín central, a la altura del pecho y fija en un tripié."),
@@ -273,12 +276,52 @@ def _narrowing(slot: float, throws: str, err: float | None, velo: float, kind: s
 
 KIND_SYS = "sistemático supuesto"
 KIND_MAE = "medido (MAE de validación)"
-KIND_BOTH = "combinado (MAE + sistemático)"
+KIND_BOTH = "combinado (MAE de validación piloto + sistemático)"
+
+
+@st.cache_data(show_spinner=False)
+def _read_validation(path: str, mtime: float) -> dict:
+    """``{(metric, measure): (value, n)}`` de las filas con valor finito; ``{}`` si el CSV no se puede leer."""
+    import math
+
+    import pandas as pd
+    try:
+        df = pd.read_csv(path)
+        out = {}
+        for r in df.itertuples(index=False):
+            v = float(r.value)
+            if math.isfinite(v):
+                out[(str(r.metric), str(r.measure))] = (v, int(r.n))
+        return out
+    except Exception:
+        return {}
+
+
+def validation_stats() -> dict:
+    """Resumen de validación (17-D) leído de ``VALIDATION_CSV``; vacío si falta el archivo."""
+    p = Path(VALIDATION_CSV)
+    if not p.is_file():
+        return {}
+    return _read_validation(str(p), p.stat().st_mtime)
+
+
+def validated_mae(measure: str) -> tuple[float, int] | None:
+    """``(MAE en grados, n lanzamientos)`` de la visión contra el promedio humano para ``measure``, o ``None``."""
+    row = validation_stats().get(("mae_vs_human_mean", measure))
+    return row if row and row[0] >= 0 else None
+
+
+def release_frame_mae_ms() -> float | None:
+    row = validation_stats().get(("release_frame_mae_ms", "release_frame"))
+    return row[0] if row else None
 
 
 def slot_error_for(m: dict, mae_slot_deg: float | None = None) -> tuple[float | None, str | None]:
-    """``(error, tipo)`` del slot para la ventana. Hoy no hay MAE de validación (17-D), así que el tipo es
-    siempre "sistemático supuesto"; ``(None, None)`` si no hay error sistemático."""
+    """``(error, tipo)`` del slot para la ventana. Si ``mae_slot_deg`` es None se toma el MAE del slot del CSV de
+    validación (17-D); sin CSV ni fila el tipo es "sistemático supuesto"; ``(None, None)`` si no hay sistemático."""
+    if mae_slot_deg is None:
+        v = validated_mae(SLOT_MEASURE)
+        mae_slot_deg = v[0] if v else None
     sys_err = m.get("slot_sys_err_deg")
     combine = getattr(PS, "combined_slot_error_deg", None)
     if sys_err is None or combine is None:
@@ -286,10 +329,22 @@ def slot_error_for(m: dict, mae_slot_deg: float | None = None) -> tuple[float | 
     return float(combine(mae_slot_deg, sys_err)), (KIND_SYS if mae_slot_deg is None else KIND_BOTH)
 
 
-def _err_text(sys_val: float | None, unit: str, decimals: int) -> str:
+def _err_text(sys_val: float | None, unit: str, decimals: int, head: str = ERR_PENDING) -> str:
     if sys_val is None:
-        return ERR_PENDING
-    return f"{ERR_PENDING} · error sistemático supuesto ±{sys_val:.{decimals}f} {unit}"
+        return head
+    return f"{head} · error sistemático supuesto ±{sys_val:.{decimals}f} {unit}"
+
+
+def _pilot_head(measure: str) -> str | None:
+    v = validated_mae(measure)
+    return None if v is None else f"error de medición en piloto: MAE {v[0]:.1f}° (n={v[1]})"
+
+
+def _feet_head() -> str:
+    """Altura y lado: el piloto no reporta MAE en pies; solo se dice si hay CSV."""
+    if validation_stats():
+        return "error de medición no validado contra humanos (el piloto no reporta MAE en pies)"
+    return ERR_PENDING
 
 
 # ----------------------------------------------------------------------------
@@ -351,13 +406,13 @@ def _measure_cards(m: dict) -> str:
     ok = bool(m["quality_ok"])
     tag = "" if ok else ("bloqueado" if m.get("blocking_issues") else "calidad insuficiente")
     c1 = C.measure_card("up", "Altura de soltura", m["rel_height_ft"], "ft",
-                        _err_text(m.get("rel_height_sys_err_ft"), "ft", 2), tag, 2)
+                        _err_text(m.get("rel_height_sys_err_ft"), "ft", 2, _feet_head()), tag, 2)
     c2 = C.measure_card("right", "Lado de soltura", m["rel_side_ft"], "ft",
-                        _err_text(m.get("rel_side_sys_err_ft"), "ft", 2), tag, 2)
+                        _err_text(m.get("rel_side_sys_err_ft"), "ft", 2, _feet_head()), tag, 2)
     c3 = C.measure_card("arm", "Arm slot (definición del dataset)", m["arm_slot_dataset_deg"], "°",
-                        _err_text(m.get("slot_sys_err_deg"), "°", 1), "filtra el catálogo" if ok else tag)
+                        _err_text(m.get("slot_sys_err_deg"), "°", 1, _pilot_head(SLOT_MEASURE) or ERR_PENDING), "filtra el catálogo" if ok else tag)
     c4 = C.measure_card("target", "Ángulo del brazo (biomecánico)", m["arm_angle_biomech_deg"], "°",
-                        ERR_PENDING, "informativo, no filtra")
+                        _pilot_head(BIOMECH_MEASURE) or ERR_PENDING, "informativo, no filtra")
     return f'<div class="dr-mini2" style="grid-template-columns:repeat(2,1fr);gap:.7rem">{c1}{c2}{c3}{c4}</div>'
 
 
@@ -393,6 +448,9 @@ def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_
         error_label = "aún no medido"
     elif kind == KIND_SYS:
         error_label = f"{kind} ±{err:.1f}° · error de medición aún no medido"
+    elif kind == KIND_BOTH and (mae := validated_mae(SLOT_MEASURE)):
+        error_label = (f"combinado ±{err:.1f}° · incluye error de medición validado en piloto "
+                       f"(MAE {mae[0]:.1f}°, n={mae[1]} lanzamientos, 2 anotadores) + sistemático supuesto")
     else:
         error_label = f"{card['error_source']} ±{err:.1f}°"
     total_hand = _pitchers_of_hand(throws)
@@ -418,11 +476,18 @@ def _render_ficha(m: dict, throws: str, velo: float | None, digest: str, height_
         notes.append("Con este margen de error el slot distingue poco; la diferencia la marca sobre todo la familia de pitcheo.")
     notes += ["Orden: mediana de Stuff+ CDMX de mayor a menor. Cada barra resume pitchers reales de la LMB con una "
              "mecánica parecida; no es un valor del prospecto."]
-    if err is not None:
+    if kind == KIND_BOTH:
+        notes.append("El error del slot combina el MAE del piloto de validación con el sistemático supuesto; "
+                     "la ventana mínima es ±6°.")
+    elif err is not None:
         notes.append("El error del slot incluye solo el error sistemático supuesto; el error de medición contra "
                      "anotadores humanos queda pendiente de la validación, y la ventana mínima es ±6°.")
     else:
         notes.append("El error de medición aún no se midió: se usa la ventana mínima de ±6°.")
+    rel_ms = release_frame_mae_ms()
+    if rel_ms is not None:
+        notes.append(f"La detección automática del frame de soltura se desvía en promedio ~{rel_ms:.0f} ms del "
+                     "frame elegido por humanos; confirma el frame en la barra.")
     st.markdown("".join(f'<div class="note">{C.esc(n)}</div>' for n in notes), unsafe_allow_html=True)
     st.markdown(f'<div class="note">{C.esc(PC.REFERENCE_NOTE)}</div>', unsafe_allow_html=True)
     st.markdown(C.disclaimer_badge(card["disclaimer"]), unsafe_allow_html=True)

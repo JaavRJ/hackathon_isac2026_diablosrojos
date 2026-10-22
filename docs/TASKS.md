@@ -986,6 +986,16 @@ Se descartó el piloto automatizado que el Orquestador había propuesto por erro
 - **Anotación:** 2 personas (A y B) marcan los 6 puntos en el frame de soltura de cada clip en la pestaña **Modo anotación** de la app **LOCAL** (localhost). La app pública escribe en un contenedor efímero y los clips solo existen localmente.
 - **Cálculo:** `analysis/validate_vision.py` calcula el ICC entre anotadores, el MAE, el RMSE y el sesgo de la visión contra el promedio humano (slot del dataset y ángulo biomecánico), y el error del frame de release, en `reports/validation/vision_validation_summary.csv`. Se reporta el N real.
 
+#### 17-D sin revisión independiente (decisión del usuario, 2026-10-21)
+- **Validación:** se corrió con las anotaciones reales de A y B (4 lanzamientos con ambos). Resultados en `reports/validation/vision_validation_summary.csv`, que sigue sin commit por decisión del usuario:
+  - ICC del slot 0.997;
+  - MAE del slot contra humanos de 12.2° (frame anotado, n=3) y 6.4° (frame detectado, n=4);
+  - error del frame de release ~177 ms;
+  - ventana combinada recomendada ±14.7°.
+- **Sin auditoría:** el usuario decidió no pasar 17-D por el Revisor. Las cifras no tienen auditoría independiente.
+- **Rarezas abiertas:** el MAE es mayor en el frame anotado que en el detectado, y hay n distintos (3 contra 4). Se comunican siempre como **piloto con n=4**, sin afirmar precisión.
+- **Ficha:** el error combinado ya está conectado (`dashboard/velovision_tab.py`, sin commit). En la app pública seguirá diciendo "aún no medido" mientras el CSV no esté versionado.
+
 ### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
 - **State:** `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
 - **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
