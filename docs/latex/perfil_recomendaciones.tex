@@ -55,6 +55,8 @@ El perfil se construye solo con lo que los datos LMB confirman (ver el documento
 %=====================================================================
 \section{Cómo perfilar a un prospecto o agente libre}
 
+\paragraph{Cómo se integran las herramientas.} Las cuatro herramientas viven en la misma aplicación y se pasan datos entre sí: el leaderboard carga a cualquier pitcher real en el simulador, y tanto el simulador como VeloVision alimentan al Pitch Sculptor. \textbf{VeloVision existe para el caso en que no hay TrackMan}, que es lo normal con prospectos de academia, amateurs o agentes libres que vienen de circuitos sin radar. Con un video de bullpen mide el slot del brazo y lo usa para buscar pitchers de la LMB con la misma mecánica en el catálogo del Sculptor. Sirve para decidir a quién vale la pena llevar a una sesión con TrackMan, no para calificar al prospecto. El flujo recomendado es:
+
 \begin{enumerate}
   \item \textbf{Con TrackMan:} cargar sus pitcheos en el simulador. Comparar el \splus\ neutral con el CDMX por pitcheo y revisar si su arsenal depende de la recta.
   \item \textbf{Sin TrackMan (VeloVision, experimental):} grabar un bullpen de lado, marcar la escala, \emph{confirmar el frame de soltura} y obtener el slot del brazo. La herramienta bloquea el resultado si el video no cumple la puerta de calidad y devuelve rangos de \splus\ CDMX por familia de pitcheo, como referencia de lo que logran pitchers de la LMB con esa mecánica, no como el nivel del prospecto. En el piloto con 2 anotadores ($n=\cf{vv.n}$) el slot por video difirió de la referencia humana ${\sim}\cf{vv.mae.det}$--$\cf{vv.mae.ann}^\circ$ (MAE); con $n$ tan pequeño es un orden de magnitud, y el error frente a TrackMan no está medido.

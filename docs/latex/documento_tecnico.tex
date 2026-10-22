@@ -19,6 +19,36 @@ Construimos tres métricas de calidad de pitcheo para la LMB en escala $100 + 10
 \end{abstract}
 
 %=====================================================================
+\section{Visión general de la solución}
+\label{sec:vision}
+
+El reto plantea una pregunta operativa para Diablos Rojos: \emph{¿qué tan bueno es un pitcher en el Harp Helú, y no a nivel del mar, y qué hacemos al respecto?} La solución tiene tres capas, y cada pieza existe para resolver una parte concreta de esa pregunta.
+
+\begin{enumerate}
+  \item \textbf{Capa física (medir el entorno).} La densidad $\rhohat$ por juego y el traductor físico (Etapa A) sustituyen la altitud que los datos no traen y permiten llevar cualquier lanzamiento a otra densidad conservando su residuo individual. Sin esta capa no existiría el sabor CDMX.
+  \item \textbf{Capa de métricas (calificar).} \splus, \lplus\ y \pplus\ convierten cada lanzamiento en una calificación en escala $100+10z$, en sabor neutral y en sabor CDMX. Su diferencia, $\Delta\splus_{\text{CDMX}}$, es la medida central del proyecto: cuánto valor pierde o gana el arsenal de un pitcher al lanzar en casa.
+  \item \textbf{Capa de decisión (actuar).} Cuatro herramientas, reunidas en una sola aplicación Streamlit, llevan esas métricas a decisiones de fichaje, de uso y de desarrollo. Se pasan datos entre sí, de modo que un mismo pitcher puede recorrerlas todas sin volver a capturarlo (Tabla~\ref{tab:componentes}).
+\end{enumerate}
+
+\begin{table}[htbp]\centering\small
+\caption{Componentes de la capa de decisión: qué pregunta responde cada uno y cómo se conecta con los demás.}\label{tab:componentes}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}X@{}}
+\toprule
+Componente & Pregunta que responde & Entrada $\to$ salida & Integración \\
+\midrule
+Leaderboard & ¿Quién gana y quién pierde valor en la CDMX? & Métricas por pitcher-temporada $\to$ ranking neutral, CDMX y $\Delta$ & Carga cualquier pitcher real en el simulador. \\
+Simulador & ¿Cuánto vale este pitcheo en casa y de gira? & Características de un pitcheo $\to$ las tres métricas en ambos sabores, SHAP y mapa de movimiento & Su pitcheo activo es la entrada del Sculptor. \\
+Pitch Sculptor & ¿Qué pitcheo o qué forma le conviene, dada su mecánica? & Slot, altura de soltura y velocidad $\to$ pares reales de la LMB y su \splus\ CDMX & Recibe la mecánica del simulador o de VeloVision. \\
+VeloVision & ¿Cómo evalúo a un prospecto que no tiene TrackMan? & Video de bullpen $\to$ slot de brazo con error declarado $\to$ rangos de \splus\ CDMX por familia & Usa el catálogo del Sculptor y le envía la mecánica medida. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\paragraph{Por qué VeloVision.} Todo lo anterior necesita datos TrackMan, y los prospectos que más interesan en la etapa de scouting (jugadores de academia, amateurs o agentes libres que vienen de circuitos sin radar) casi nunca los tienen. VeloVision cierra ese hueco con un video de bullpen grabado de perfil: mide el slot del brazo, la variable mecánica que define a qué pitchers de la LMB se parece el prospecto, y la usa como llave de búsqueda en el mismo catálogo de arsenales que consulta el Pitch Sculptor. Así responde, con un rango y no con un punto, qué pitcheos suelen funcionar en la CDMX con esa mecánica. Con un clic, la mecánica medida pasa al Sculptor, que amplía sus tolerancias según el error del video. VeloVision no califica al prospecto: es un filtro de scouting que indica a quién vale la pena llevar a una sesión con TrackMan, donde ya entran el simulador y las métricas completas.
+
+\paragraph{Flujo de uso.} Un caso típico recorre las tres capas: el leaderboard señala a un pitcher con $\Delta$ negativo; el simulador muestra qué pitcheo lo explica; el Sculptor propone qué cambiar dentro de lo que su mecánica permite. Si el candidato no tiene TrackMan, VeloVision sustituye el primer paso. Los tres casos del documento de perfil y recomendaciones siguen este flujo. El resto de este documento justifica cada capa: la física (Sección~\ref{sec:teoria}), los datos (Sección~\ref{sec:datos}), los modelos (Sección~\ref{sec:modelos}), su validación (Sección~\ref{sec:val}), la evidencia de altitud (Sección~\ref{sec:altitud}) y las herramientas con sus límites (Sección~\ref{sec:aplicacion}).
+
+%=====================================================================
 \section{Marco teórico: por qué la altitud cambia el pitcheo}
 \label{sec:teoria}
 
