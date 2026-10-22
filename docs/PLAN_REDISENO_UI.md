@@ -1,6 +1,16 @@
 # Plan de Desarrollo — Rediseño Visual de Diablos AeroVision (HACK-019)
 
-> **Estado:** propuesto, pendiente de aprobación del mockup (Fase 0).
+> **Estado a la fecha (22-oct-2026): implementado y `APPROVED` (HACK-019).** Lo que sigue es el plan original; esta nota resume qué se hizo y qué cambió.
+>
+> **Implementado:** Fases 0–3 (mockup aprobado, sistema de diseño, shell + Simulador, Mapa + Leaderboard con tarjeta + Sculptor), franja de cifras ancla leída de `reports/validation/`, pastillas de procedencia, ρ̂ leído del modelo, columna de incertidumbre marcada "± pendiente" (sin IC inventado), y después la pestaña **Inicio** (HACK-021), **VeloVision** real (HACK-017) y **Modo anotación**. Hoy son **7 pestañas**: Inicio, Simulador, Mapa de movimiento, Leaderboard, Sculptor, VeloVision y Modo anotación. Sculptor, VeloVision y Modo anotación se muestran con **zoom al 125 %** (`dashboard/theme.py`, contenedores `zoom_*`).
+>
+> **Qué cambió respecto al plan:**
+> 1. **Modo claro en lugar del "laboratorio nocturno".** El tema final es claro ("sport-tech", `.streamlit/config.toml`, `base = "light"`); la dirección oscura de §2 no se implementó. Se conservan las reglas de §2 que no dependían del fondo: el rojo `#CE1126` solo como marca y la escala divergente de datos.
+> 2. **VeloVision ya no es una pestaña "En espera":** se implementó (con piloto de n=4, ver `TASKS.md`).
+> 3. **Pestañas "Escenarios" y "Metodología" (§3.1, puntos 11–12) y "Modo Presentación" (§3, punto 7): no se implementaron como pestañas.** La explicación vive en la pestaña Inicio y en el paper LaTeX.
+> 4. Se añadieron **Inicio** y **Modo anotación**, que el plan no contemplaba.
+> 5. Quedan abiertos: IC por pitcher en el leaderboard, y el criterio 5 de §5 (capturas revisadas por el usuario).
+> 6. El riesgo científico de §1.3 y §3.2 (sensibilidad de Stuff+ al movimiento) se atendió en la segunda reapertura de HACK-010 (ver `TASKS.md`); la sensibilidad medida está en `reports/validation/stuff_diagnostics.csv`.
 > **Base:** [DISENO_UI_NIELSEN.md](DISENO_UI_NIELSEN.md) (usabilidad, se adopta casi completa) + auditoría visual del dashboard actual (2026-10-20).
 > **No reabre HACK-015:** se registra como tarea nueva HACK-019 con AllowedPaths propios.
 

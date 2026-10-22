@@ -1,5 +1,12 @@
 # Especificación de Diseño UX/UI Basada en las 10 Heurísticas de Jakob Nielsen — Diablos AeroVision
 
+> **Nota de estado (22-oct-2026): documento de especificación de usabilidad; la implementación visual vigente es [`PLAN_REDISENO_UI.md`](PLAN_REDISENO_UI.md) (HACK-019).**
+> Qué se implementó: barra de contexto, presupuesto de latencia, textos de honestidad, divulgación progresiva y flujo guiado. Qué cambió:
+> - **Modo claro.** Las referencias de este documento a fondos oscuros, colores y tamaños concretos (p. ej. `#8A8A8A`) son del diseño inicial; los tokens vigentes están en `dashboard/theme.py` y `.streamlit/config.toml`.
+> - **Pestañas.** Hoy son **7** (Inicio, Simulador, Mapa de movimiento, Leaderboard, Sculptor, VeloVision, Modo anotación), no 5.
+> - **ρ̂ de CDMX.** Donde este documento dice ρ̂ ≈ 0.78, **el valor correcto es el del modelo: 0.852** (`models/stuff_model.joblib`, `rho_extreme_median_`), mediana de `Extreme Altitude`. El 0.78 es el valor teórico de atmósfera estándar a 2,240 m; la app lee siempre el del modelo y nunca lo escribe a mano.
+> - Las cifras de la descomposición se leen de `reports/altitude/channel_decomposition.csv`.
+
 > **Proyecto:** Hackathon ISAC 2026 · Reto 2 Diablos Rojos del México  
 > **Producto:** **Diablos AeroVision** (`dashboard/app.py`, `dashboard/ui_utils.py`, `dashboard/sculptor_tab.py`, `dashboard/velovision_tab.py`)  
 > **Usuarios objetivo:** Pitching Coach, Coordinador de Bullpen, Analista de Scouting y Dirección Deportiva de Diablos Rojos del México.  

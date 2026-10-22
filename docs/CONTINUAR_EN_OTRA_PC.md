@@ -1,44 +1,47 @@
-# Continuar los análisis en otra computadora
+# Continuar el proyecto en otra computadora
 
-Estado al cerrar este traslado (20-oct-2026): HACK-012 y HACK-013 están en REVIEW. La validación HACK-012 terminó sobre 634,624 lanzamientos y sus tres reportes están en `reports/validation/`; no hace falta repetir esa corrida para continuar la revisión. Stuff+ no supera al baseline en todos los criterios y la estabilidad es in-sample: consultar las notas de `docs/TASKS.md`.
+Estado a la fecha (22-oct-2026): el código, los modelos entrenados (`models/*.joblib`), el modelo de pose (`models/pose_landmarker_full.task`) y los reportes agregados (`reports/**/*.csv`) están en git. **La app corre solo con un `git clone` y las dependencias.** Lo que no está en git son los datos y los clips de video. El tablero de tareas y su estado real están en [`TASKS.md`](TASKS.md); la app pública y su despliegue, en [`DEPLOY.md`](DEPLOY.md).
 
-HACK-013 tiene código corregido y tests, pero sus tablas anteriores fueron retiradas porque no corresponden al código final. No se volvió a entrenar ni se guardó el modelo previo. Su regeneración queda pendiente, sujeta a nueva instrucción del usuario. Los seguimientos automáticos fueron eliminados y no se inició revisión posterior ni otra tarea del sprint.
+## 1. Clonar y preparar Python
 
-## Archivos necesarios
-
-- Código completo, `requirements.txt`, `docs/`, `tests/` y reportes agregados del commit de traslado.
-- `data/stuff_processed_df.parquet` (datos privados, ignorados en git).
-- Para ejecutar los tests que consultan el diccionario: copiar también `stuff_plus_data_dictionary.csv` a `data/` desde la carpeta original del dataset.
-- Si existen checkpoints: copiar juntos `reports/validation/run_status.json`, `holdout_metrics_partial.csv` y `calibration_deciles_partial.csv`.
-
-El ZIP local de traslado contiene datos privados y una copia anterior del código. Usar Git para obtener el código final; del ZIP recuperar los datos necesarios sin sobrescribir ese código. No publicar el ZIP ni enviarlo al deploy.
-
-## Preparar Python
-
-Desde la raíz del proyecto, usar Python 3.11 o superior y crear un entorno virtual. Instalar `numpy pandas pyarrow scipy scikit-learn lightgbm shap joblib pytest`; para el proyecto completo, usar `python -m pip install -r requirements.txt` e instalar también `pytest`.
-
-## Ejecutar solo si se autoriza otra corrida
-
-Validación nueva con checkpoints por partición:
+Python 3.12 (lo probado es 3.12.1; 3.11 o superior debería servir). Desde la raíz:
 
 ```powershell
-python -m analysis.run_validation --input data/stuff_processed_df.parquet --reports-dir reports/validation
+git clone https://github.com/JaavRJ/hackathon_isac2026_diablosrojos.git
+cd hackathon_isac2026_diablosrojos
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt          # lo que importa la app desplegada (versiones fijadas)
+pip install -r requirements-dev.txt      # análisis y tests: incluye requirements.txt + pytest, shap, xgboost, catboost, econml, etc.
 ```
 
-Reanudar una corrida que sí haya guardado checkpoints compatibles:
+`requirements-dev.txt` es necesario para correr `pytest` y los scripts de `analysis/`. `packages.txt` es solo para Streamlit Cloud (apt), no se instala en local.
+
+## 2. Qué trae git y qué no
+
+| En git | Fuera de git (cópialo a mano) |
+| :--- | :--- |
+| `dashboard/`, `src/`, `analysis/`, `tests/`, `docs/` | `data/stuff_model_df.parquet` (crudo) |
+| `models/*.joblib` y `models/pose_landmarker_full.task` | `data/stuff_processed_df.parquet` (se regenera con `python -m src.pipeline_step1`) |
+| `reports/**/*.csv` | `data/stuff_plus_data_dictionary.csv` (los tests que consultan el diccionario) |
+| `.streamlit/config.toml`, `requirements*.txt`, `packages.txt` | `data/vision_clips/` (clips de VeloVision y del Modo anotación) |
+| | `data/deliverables/` (scores por pitcheo; salida de `analysis.export_scores`) |
+
+Los datos de ISAC son privados: no los publiques ni los subas al despliegue. `.gitignore` excluye `data/`, `*.parquet`, `*.mp4`, `*.mov`.
+
+## 3. Verificar que todo funciona
 
 ```powershell
-python -m analysis.run_validation --input data/stuff_processed_df.parquet --reports-dir reports/validation --resume
+.venv\Scripts\python.exe -m pytest -q        # usa un fixture sintético; no necesita el parquet
+streamlit run dashboard/app.py               # usa models/ y reports/
 ```
 
-La opción `--resume` no recupera los resultados en memoria de la corrida original. Antes de usarla, comprobar que el código instalado la muestra en `python -m analysis.run_validation --help`.
+## 4. Regenerar reportes (solo si se autoriza otra corrida)
 
-Análisis de altitud (entrena el modelo si no se proporciona uno ajustado):
+Requiere los parquets de `data/`. Orden y detalles en el README de la raíz (sección 7). Las corridas de validación y de hipótesis son pesadas; `analysis.run_validation` tiene `--resume` para reanudar desde checkpoints agregados (`reports/validation/*_partial.csv`, `run_status.json`). Confirma con `python -m analysis.run_validation --help` que la opción existe en tu copia.
 
-```powershell
-python -m analysis.run_hypotheses --input data/stuff_processed_df.parquet --output-dir reports/altitude
-```
+## 5. Notas
 
-## Qué se conserva
-
-Los checkpoints de validación preservan métricas agregadas de particiones terminadas. El entrenamiento de una partición a medias se vuelve a ejecutar. El análisis de altitud actual no ofrece reanudación del entrenamiento. Ninguna tarea puede marcarse APPROVED hasta completar sus verificaciones y la revisión independiente.
+- Los scripts resuelven el parquet crudo desde `data/` o desde las rutas definidas en `src/config.py`; si no lo encuentran, indícalo con `--raw-path` / `--input`.
+- El Modo anotación (dos anotadores) y `analysis.validate_vision` solo funcionan en local, con los clips en `data/vision_clips/`.
+- Ninguna tarea puede marcarse `APPROVED` sin su revisión; ver `AGENTS.md` y `TASKS.md`.

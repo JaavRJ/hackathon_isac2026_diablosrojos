@@ -36,6 +36,7 @@ ID_AND_GROUP_COLS = [
 ```
 
 ### 1.3 Columnas Prohibidas en `Stuff+` Puro (`LOCATION_AND_COUNT_COLS`)
+> Además de estas, Stuff+ no admite los proxies de trayectoria de §5.2 ni nada fuera de `STUFF_FEATURES` (§5.1).
 Exclusivas para `Location+` y `Pitching+`:
 ```python
 LOCATION_AND_COUNT_COLS = [
@@ -105,3 +106,65 @@ Todo modelo de la familia `Score+` produce valores con media `100.0` y desviaci�
 
 Para que cualquier agente ejecutor o revisor corra `pytest` en menos de 5 segundos sin requerir los 206 MB de datos reales:
 - El fixture `synthetic_lmb_df` (definido en `HACK-001`) genera un `DataFrame` determinista (`np.random.default_rng(42)`) de `1,200` filas y las **84 columnas exactas** del diccionario con tipos idénticos al parquet real, conteniendo 12 pitchers, 18 juegos en las 3 altitudes (`No Altitude`, `Medium Altitude`, `Extreme Altitude`) y las 3 temporadas (`2024`, `2025`, `2026`).
+
+---
+
+## 5. Contrato de Stuff+ (actualizado al estado final, 22-oct-2026; fuente: `src/models/stuff.py`)
+
+### 5.1 `STUFF_FEATURES` (22 columnas, sin proxies de ubicación)
+```python
+STUFF_FEATURES = [
+    "RelSpeed", "EffectiveVelo", "ZoneSpeed", "SpinRate", "SpinAxis_sin", "SpinAxis_cos",
+    "RelHeight", "RelSide_norm", "Extension", "InducedVertBreak", "HorzBreak_norm",
+    "TotalInducedBreak", "BreakAngle_deg", "SpinToBreakRatio", "arm_slot_deg", "PitcherThrows",
+    "velo_diff_vs_fb", "ivb_diff_vs_fb", "hb_diff_vs_fb",
+    "tunnel_dist_release_in", "tunnel_sim_release", "pitch_usage_pct",
+]
+```
+Respecto a la especificación original de HACK-010 salieron `VertRelAngle`, `HorzRelAngle_norm`, `tunnel_dist_170ms_in` y `tunnel_sim_170ms` (segunda reapertura): con la lista anterior se reconstruía la ubicación en el plato con R² fuera de muestra ≈ 0.99. Esas columnas siguen existiendo para Location+ y Pitching+; ambos túneles se conservan como features del proyecto (AGENTS.md §3.6), pero **solo `tunnel_*_release` entra a Stuff+**.
+
+### 5.2 `TRAJECTORY_PROXY_COLS` (prohibidas en Stuff+)
+```python
+TRAJECTORY_PROXY_COLS = [
+    "VertRelAngle", "HorzRelAngle", "HorzRelAngle_norm", "VertApprAngle", "HorzApprAngle",
+    "tunnel_dist_170ms_in", "tunnel_sim_170ms",
+]
+```
+`assert_valid_stuff_features` lanza `ValueError` si alguna entra a Stuff+ y aplica además una whitelist estricta (`STUFF_FEATURES`), además de `assert_no_leakage(..., "stuff")`.
+
+### 5.3 Métodos públicos de `StuffPlusModel`
+| Método | Firma | Salida |
+| :--- | :--- | :--- |
+| `fit` | `fit(train_df, movement_translator=None) -> StuffPlusModel` | Entrena 8 submodelos sobre el **residuo** `y − baseline_conteo(y)` (el conteo entra solo como offset, nunca como feature) con filas `No Altitude` y OOF por pitcher; hiperparámetros por CV por pitcher en `No Altitude` ≤ 2025. |
+| `predict_scores` | `predict_scores(df, movement_translator=None, rho_cdmx=None) -> DataFrame` | Copia de `df` con `stuff_plus_neutral`, `stuff_plus_cdmx`, `delta_stuff_cdmx` (float64). `rho_cdmx=None` usa `rho_extreme_median_` del modelo (0.852). |
+| `predict_outcomes` | `predict_outcomes(df) -> DataFrame` | Una columna por cada target de `TARGET_COLS` (mismos nombres que `CountBaselineModel.predict`): `baseline_conteo + residuo_stuff`; los 7 binarios recortados a `[1e-6, 1−1e-6]`. Es lo que HACK-012 compara contra el baseline. Alterar `Balls`/`Strikes` cambia `predict_outcomes` pero **no** `stuff_plus_*`. |
+| `predict` | `predict(df) -> DataFrame` | Alias de `predict_outcomes`. |
+| `explain_pitch` | `explain_pitch(df_row, target_rho=1.0) -> dict` | TreeSHAP aditivo en la escala combinada de Stuff+. |
+
+Atributos usados por la app y los reportes: `rho_extreme_median_`, `feature_cols`.
+
+### 5.4 Escala
+`Score+ = 100 + 10·z`, con `z` calculado con (μ, σ) del Stuff+ **neutral** sobre el LMB completo. Stuff+ es un descriptor físico estable; **empata con el baseline en xRV por pitcheo** (`reports/validation/holdout_metrics.csv`).
+
+---
+
+## 6. Contrato de VeloVision (HACK-017; `src/vision/`)
+
+- `extract_pose_sequence(video_path, max_seconds=6.0, ...) -> PoseSequence`: usa MediaPipe Tasks con `models/pose_landmarker_full.task` (versionado). Lanza `PoseModelUnavailable` si no encuentra el modelo.
+- `detect_release_frame(seq, throws) -> dict` con `frame_idx, confidence, candidates, peak_score, wrist_ahead, valid` (`valid=False` si el pico no alcanza `RELEASE_PEAK_MIN` o la muñeca nunca pasa por delante del hombro).
+- `measure_release(seq, frame_idx, throws, height_ft) -> dict` con `rel_height_ft, rel_side_ft, arm_slot_dataset_deg, arm_angle_biomech_deg, ft_per_px` (`None` si no se pudo medir), **campos de calidad** `quality_score` (0–1), `quality_issues`, `quality_ok` y `blocking_issues` (la compuerta de calidad bloquea aunque el puntaje pase: sujeto muy pequeño, vista de perfil, landmarks clave faltantes), y **error sistemático supuesto** `rel_height_sys_err_ft, rel_side_sys_err_ft, slot_sys_err_deg, origin_notes`. La fórmula del slot es la de `arm_slot_deg` del dataset.
+- `combined_slot_error_deg(mae_slot_deg, slot_sys_err_deg) -> float` = `sqrt(mae² + sys²)`.
+- `build_prospect_card(arm_slot_dataset_deg, throws, rel_height_ft=None, slot_error_deg=None, observed_velo_mph=None, min_pitchers=8, catalog=None, slot_error_kind=None) -> dict` con `families, window_deg, error_source, filters_applied, n_pitchers_total, sculptor_params, disclaimer`. Devuelve **rangos** (percentiles 10/25/50/75/90 de `stuff_plus_cdmx` y `delta_stuff_cdmx` de pitchers reales del catálogo `pitcher_arsenal_breakdown.csv`), nunca un valor puntual del prospecto ni un `pitcher_anon_id`. Ventana de slot = `max(6°, slot_error_deg)`.
+
+## 7. Salidas de `reports/` (todas agregadas; sin `PitchUID`)
+
+| Carpeta | Archivo | Productor |
+| :--- | :--- | :--- |
+| `altitude/` | `game_density_summary.csv`, `relabeling_audit.csv` | `src/pipeline_step1.py` |
+| `altitude/` | `hypotheses_h1_h4_summary.csv`, `delta_by_pitch_shape.csv`, `channel_decomposition.csv` (descomposición de 3 términos: `canal_stuff`, `canal_parque_bip`, `residuo_no_atribuido`) | `analysis/run_hypotheses.py` |
+| `validation/` | `holdout_metrics.csv`, `calibration_deciles.csv`, `year_to_year_stability.csv` (+ `*_partial.csv`, `run_status.json`, `partition_timing.json` de checkpoints) | `analysis/run_validation.py` |
+| `validation/` | `stuff_diagnostics.csv` (R² de reconstruir ubicación, rejilla de LightGBM, sensibilidad) | `analysis/stuff_diagnostics.py` |
+| `validation/` | `vision_manual_annotations.csv`, `vision_clip_registry.csv`, `vision_validation_by_clip.csv`, `vision_validation_summary.csv` (piloto n=4) | Modo anotación + `analysis/validate_vision.py` |
+| `leaderboards/` | `pitcher_season_leaderboard.csv`, `pitcher_arsenal_breakdown.csv`, `movement_map_grid.csv` | `analysis/export_scores.py` |
+
+`docs/latex/generated/` lo produce `analysis/build_paper_numbers.py` leyendo estos CSV. Los modelos serializados `models/*.joblib` (4) los escribe `analysis/export_scores.py`; `models/pose_landmarker_full.task` es un artefacto de MediaPipe versionado.

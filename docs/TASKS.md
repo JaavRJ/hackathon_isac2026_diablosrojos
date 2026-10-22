@@ -20,17 +20,17 @@
 | **HACK-007** | S1 | P0 | `APPROVED` | `HACK-006` | Particiones oficiales (Pitcher/Season/Park Holdout) y Baseline Nulo (`src/splits.py`, `src/baseline.py`) |
 | **HACK-008** | S1 | P0 | `APPROVED` | `HACK-003, HACK-005, HACK-007` | Pipeline integrador de dataset procesado (`src/pipeline_step1.py`) |
 | **HACK-009** | S2 | P0 | `APPROVED` | `HACK-008` | Etapa A: Traductor físico intra-pitcher de movimiento por densidad (`src/models/movement.py`) |
-| **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo (`src/models/stuff.py`) |
+| **HACK-010** | S2 | P0 | `APPROVED` | `HACK-009` | Submodelo `Stuff+` (neutral y CDMX) sin leakage de ubicación/conteo: residuo sobre el conteo y sin proxies de ubicación (`src/models/stuff.py`) |
 | **HACK-011** | S2 | P0 | `APPROVED` | `HACK-008` | Submodelo `Location+` y `Pitching+` con combinación multi-target (`src/models/location_pitching.py`) |
-| **HACK-012** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad (`analysis/run_validation.py`) |
-| **HACK-013** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Descomposición Canal Stuff vs Canal Parque y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
+| **HACK-012** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Suite de validación en los 3 holdouts vs Baseline Nulo + Estabilidad; Pitching+ gana en todo, Stuff+ se juzga en targets de stuff y empata en `xrv_pitcher` (`analysis/run_validation.py`) |
+| **HACK-013** | S2 | P0 | `APPROVED` | `HACK-010, HACK-011` | Descomposición de 3 términos (canal Stuff, canal parque, residuo no atribuido) y pruebas empíricas H1–H4 (`analysis/run_hypotheses.py`) |
 | **HACK-014** | S2 | P0 | `APPROVED` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
-| **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`) |
+| **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`); hoy con 7 pestañas |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
-| **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores (`src/vision/`) |
-| **HACK-018** | S4 | P1 | `APPROVED` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos en LaTeX: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/latex/`) |
+| **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores: piloto n=4 sin revisión independiente, por decisión del usuario (`src/vision/`) |
+| **HACK-018** | S4 | P1 | `APPROVED` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos en LaTeX: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/latex/`), con la sección de VeloVision actualizada con el piloto |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
-| **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (URL pública, versiones fijadas, sin datos crudos) |
+| **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (versiones fijadas, sin datos crudos). App publicada en https://diablos-aerovision.streamlit.app (repo privado, app pública); prueba de humo pendiente de registrar en `docs/DEPLOY.md` |
 | **HACK-021** | S4 | P0 | `APPROVED` | `HACK-019, HACK-017` | Homepage "Inicio": portada de producto de Diablos AeroVision dentro de la app (`dashboard/home_tab.py`) |
 
 ---
