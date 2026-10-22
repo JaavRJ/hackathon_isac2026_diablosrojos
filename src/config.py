@@ -8,16 +8,16 @@ import os
 # Directorio raíz del proyecto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Búsqueda inteligente de rutas del dataset
-POSSIBLE_RAW_PATHS = [
+# Búsqueda de rutas del dataset (sin rutas de una PC concreta). Orden: variable de entorno
+# DIABLOS_RAW_DATA (ruta al parquet), data/ del repo y ~/Downloads/Diablos - Hackathon 2026/.
+_ENV_RAW = os.environ.get("DIABLOS_RAW_DATA")
+POSSIBLE_RAW_PATHS = ([Path(_ENV_RAW)] if _ENV_RAW else []) + [
     BASE_DIR / "data" / "stuff_model_df.parquet",
-    Path(r"C:\Users\L13Yoga\Downloads\Diablos - Hackathon 2026\stuff_model_df.parquet"),
     Path(os.path.expanduser(r"~\Downloads\Diablos - Hackathon 2026\stuff_model_df.parquet")),
 ]
 
-POSSIBLE_DICT_PATHS = [
+POSSIBLE_DICT_PATHS = ([Path(_ENV_RAW).with_name("stuff_plus_data_dictionary.csv")] if _ENV_RAW else []) + [
     BASE_DIR / "data" / "stuff_plus_data_dictionary.csv",
-    Path(r"C:\Users\L13Yoga\Downloads\Diablos - Hackathon 2026\stuff_plus_data_dictionary.csv"),
     Path(os.path.expanduser(r"~\Downloads\Diablos - Hackathon 2026\stuff_plus_data_dictionary.csv")),
 ]
 
@@ -27,7 +27,7 @@ for p in POSSIBLE_RAW_PATHS:
         RAW_DATA_PATH = p
         break
 if RAW_DATA_PATH is None:
-    RAW_DATA_PATH = Path(r"C:\Users\L13Yoga\Downloads\Diablos - Hackathon 2026\stuff_model_df.parquet")
+    RAW_DATA_PATH = BASE_DIR / "data" / "stuff_model_df.parquet"
 
 DATA_DICT_PATH = None
 for p in POSSIBLE_DICT_PATHS:
@@ -35,7 +35,7 @@ for p in POSSIBLE_DICT_PATHS:
         DATA_DICT_PATH = p
         break
 if DATA_DICT_PATH is None:
-    DATA_DICT_PATH = Path(r"C:\Users\L13Yoga\Downloads\Diablos - Hackathon 2026\stuff_plus_data_dictionary.csv")
+    DATA_DICT_PATH = BASE_DIR / "data" / "stuff_plus_data_dictionary.csv"
 
 # Directorios de salida
 DATA_DIR = BASE_DIR / "data"

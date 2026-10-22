@@ -43,7 +43,7 @@
 7. La estrategia de identificación del efecto de altitud debe ser explícita (variación intra-pitcher, PROJECT_CONTEXT §5). No escribas "Double ML elimina el sesgo" sin decir qué confusores se controlan y cómo.
 
 ## 3. Reglas de datos
-1. Dataset: `C:\Users\L13Yoga\Downloads\Diablos - Hackathon 2026\stuff_model_df.parquet` (635,002 × 84). Diccionario: `stuff_plus_data_dictionary.csv` en la misma carpeta. Requiere `pyarrow >= 20`.
+1. Dataset: `stuff_model_df.parquet` (635,002 × 84) y su diccionario `stuff_plus_data_dictionary.csv`. Van en `data/` del repo (ignorado en git), en `~/Downloads/Diablos - Hackathon 2026/` o en la ruta indicada por la variable de entorno `DIABLOS_RAW_DATA` (ver `src/config.py` y `docs/CONTINUAR_EN_OTRA_PC.md`). Requiere `pyarrow >= 20`.
 2. Datos crudos y predicciones pitch-by-pitch **nunca** van a git ni al deploy. Solo agregados y figuras.
 3. **Leakage:** columnas con `feature_role = target_only` jamás son features. `location_plus_only` (`PlateLocHeight`, `PlateLocSide`, `in_strike_zone`, `outside_strike_zone`) jamás entran en Stuff+.
 4. IDs (`pitcher_anon_id`, `batter_anon_id`, `game_anon_id`, `catcher_anon_id`) solo para agrupar, partir y agregar; nunca como features.
@@ -70,8 +70,8 @@ src/vision/     # VeloVision
 src/sculptor/   # Pitch Sculptor
 analysis/       # corridas pesadas → reports/
 reports/        # tablas y figuras agregadas (sí van a git, ≤ 2 MB)
-models/         # modelos serializados (no van a git)
-dashboard/      # app (UI en español, rojo Diablos + negro)
+models/         # modelos serializados (.joblib) y modelo de pose de MediaPipe (.task): SÍ van a git para que la app corra tras clonar
+dashboard/      # app Streamlit (UI en español, modo claro; rojo Diablos solo como marca)
 docs/           # paper, benchmark, decisiones
 ```
 
