@@ -31,20 +31,26 @@ Reparto: P1 ≈ 130 s · P2 ≈ 165 s (el reparto es más parejo que antes y cad
 
 ## 3. Guion
 
-### 0:00–0:35 · Gancho — P1 (≈ 80 palabras)
+### 0:00–0:35 · Gancho — P1 (≈ 78 palabras)
 *Lámina 1.*
-> "¿Ficharían a un cerrador por su recta de mucha subida… sin saber cuánta le queda en la Ciudad de México?
-> En el Harp Helú hay **15 % menos aire** que a nivel del mar. Menos aire, menos movimiento: una recta 4 costuras pierde en promedio **4.5 puntos de Stuff+** al llegar aquí.
-> Somos [equipo] y construimos **Diablos AeroVision**: la herramienta que le dice al cuerpo técnico de los Diablos cuánto valor pierde cada pitcheo por la altitud y qué referencias reales seguir para recuperarlo."
+> "¿Firmarían a un cerrador estrella por el movimiento de su recta… sin saber cuánto de ese movimiento sobrevive en la Ciudad de México? *(Pausa breve)*
+> En el Estadio Alfredo Harp Helú hay **15 % menos densidad de aire** que a nivel del mar. Menos aire significa menos rompimiento: al llegar aquí, una recta de cuatro costuras pierde en promedio **4.5 puntos de Stuff+**.
+> Somos [Nombre del equipo] y creamos **Diablos AeroVision**: la plataforma que traduce el impacto de la altitud en decisiones para el cuerpo técnico, revelando cuánto valor pierde cada pitcheo y cómo ajustarlo para recuperarlo."
 
 *Fuentes: ρ̂ = 0.852 del modelo; Four-Seam −4.52 de `pitcher_arsenal_breakdown.csv`.*
 
-### 0:35–1:35 · Problema, solución y evidencia — P1 (≈ 140 palabras)
-*Láminas 2 (física), 3 (tres modelos), 4 (holdouts + descomposición). Cambiar de lámina en cada párrafo.*
-> "La física es simple: el efecto Magnus, el arrastre y el *seam-shifted wake* dependen de la densidad del aire; solo la gravedad no cambia. Así que en CDMX las pelotas **se mueven menos**.
-> Con **634 mil pitcheos** de la LMB construimos tres modelos: **Stuff+** para la calidad física del pitcheo, **Location+** para la ubicación y **Pitching+** para los dos juntos. Cada uno se calcula a nivel del mar y en el aire del Harp Helú.
-> ¿Por qué creernos? Validamos en tres escenarios que el modelo no vio: pitchers nuevos, la temporada 2026 y los parques de altura. **Pitching+ reduce entre 4 y 5 % el error frente al baseline** en los tres. Stuff+ es muy estable de un año a otro (r = 0.74).
-> Y separamos la causa: del efecto total de la altitud, cerca del **9 % es pérdida de movimiento**, el **42 % son batazos que vuelan más** y el resto no lo atribuimos a nadie. Lo decimos tal cual."
+### 0:35–1:35 · Problema, solución y evidencia — P1 (≈ 142 palabras)
+*Cambiar de lámina en cada párrafo.*
+
+*Lámina 2: Física.*
+> "La física no perdona: el efecto Magnus, el arrastre y el *seam-shifted wake* dependen directamente de la densidad del aire. Como la gravedad es lo único que no cambia, en la capital la pelota simplemente se mueve menos.
+
+*Lámina 3: Tres modelos.*
+> Para medir este efecto, entrenamos tres modelos con **634 mil pitcheos** de la LMB: **Stuff+** para la física pura del lanzamiento, **Location+** para el comando, y **Pitching+** integrando ambos. Evaluamos cada pitcheo en dos realidades: a nivel del mar y en la atmósfera del Harp Helú.
+
+*Lámina 4: Holdouts + Descomposición.*
+> ¿Por qué confiar en nuestras predicciones? Validamos el sistema a ciegas en tres escenarios: pitchers nuevos, la temporada 2026 y estadios de altura. En todos, **Pitching+ reduce el error entre un 4 y 5 % frente al baseline**, mientras que Stuff+ demuestra una alta estabilidad año con año (r = 0.74).
+> Además, aislamos el problema real: del castigo total de la altitud, el **42 % son batazos que viajan más lejos** y un **9 % es pérdida directa de movimiento** en el pitcheo. El resto es varianza del juego: reportamos solo lo que la evidencia respalda, sin cajas negras."
 
 *Última frase de P1 antes de la demo (≈ 3 s): "Y ahora, lo vemos funcionando." → corte a la pantalla de P2.*
 

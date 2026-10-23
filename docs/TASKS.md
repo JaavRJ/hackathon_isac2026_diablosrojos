@@ -27,10 +27,10 @@
 | **HACK-014** | S2 | P0 | `APPROVED` | `HACK-012, HACK-013` | Exportador oficial Entregable 1: scores por `PitchUID` y agregados (`analysis/export_scores.py`) |
 | **HACK-015** | S3 | P0 | `APPROVED` | `HACK-014` | Dashboard Simulador Base Obligatorio en Streamlit (`dashboard/app.py`); hoy con 7 pestañas |
 | **HACK-016** | S3 | P1 | `APPROVED` | `HACK-014` | **AI Pitch Sculptor** como buscador de referencias reales factibles (sin reentrenar) + pestaña UI (`src/sculptor/optimizer.py`) |
-| **HACK-017** | S3 | P0 | `IN_PROGRESS` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores: piloto n=4 sin revisión independiente, por decisión del usuario (`src/vision/`) |
+| **HACK-017** | S3 | P0 | `APPROVED` | `HACK-014` | **VeloVision**: ficha de prospecto desde video (punto de soltura → slot del dataset → rango Stuff+ CDMX por familia) + validación con 2 anotadores: piloto n=4 sin revisión independiente, por decisión del usuario (`src/vision/`) |
 | **HACK-018** | S4 | P1 | `APPROVED` | `HACK-014, HACK-015, HACK-016, HACK-017` | Entregables escritos en LaTeX: Perfil Físico Ideal, 3 Casos de Entrevista y Documento Técnico 6–10 págs (`docs/latex/`), con la sección de VeloVision actualizada con el piloto |
 | **HACK-019** | S3 | P1 | `APPROVED` | `HACK-015, HACK-016` | Rediseño visual del dashboard ("Laboratorio aerodinámico nocturno") según `docs/PLAN_REDISENO_UI.md` |
-| **HACK-020** | S4 | P0 | `REVIEW` | `HACK-019` | Despliegue público en Streamlit Community Cloud (versiones fijadas, sin datos crudos). App publicada en https://diablos-aerovision.streamlit.app (repo privado, app pública); prueba de humo pendiente de registrar en `docs/DEPLOY.md` |
+| **HACK-020** | S4 | P0 | `APPROVED` | `HACK-019` | Despliegue público en Streamlit Community Cloud (versiones fijadas, sin datos crudos). App publicada en https://diablos-aerovision.streamlit.app (repo y app públicos); prueba de humo registrada en `docs/DEPLOY.md` |
 | **HACK-021** | S4 | P0 | `APPROVED` | `HACK-019, HACK-017` | Homepage "Inicio": portada de producto de Diablos AeroVision dentro de la app (`dashboard/home_tab.py`) |
 
 ---
@@ -752,7 +752,7 @@
 ---
 
 ### `HACK-017` — VeloVision: Ficha de Prospecto desde Video (Video $\to$ Punto de Soltura $\to$ Rango Stuff+ CDMX por Familia)
-- **State:** `IN_PROGRESS` (reespecificada por el Orquestador con el usuario, 2026-10-21)
+- **State:** `APPROVED` (2026-10-22: re-revisión de 17-D aprobada; el Orquestador cambia el estado global). Antes: `IN_PROGRESS` (reespecificada por el Orquestador con el usuario, 2026-10-21)
 - **Sprint:** 3 · **Priority:** `P0` (subida de P1 por decisión del usuario) · **DependsOn:** `HACK-014`
 - **Objetivo de producto:** desde un video de celular, un coach obtiene una **ficha de prospecto**: su punto de soltura y arm slot medidos **con su error**, y para cada familia de pitcheo el **rango** de Stuff+ CDMX y ΔStuff+ que tienen los lanzadores reales de la LMB con esa mecánica. Nunca da un número único, nunca dice medir spin, quiebre ni velocidad, y nunca empareja el video con un `pitcher_anon_id`.
 
@@ -997,7 +997,7 @@ Se descartó el piloto automatizado que el Orquestador había propuesto por erro
 - **Ficha:** el error combinado ya está conectado (`dashboard/velovision_tab.py`, sin commit). En la app pública seguirá diciendo "aún no medido" mientras el CSV no esté versionado.
 
 ### `HACK-020` — Despliegue Público de Diablos AeroVision (URL pública)
-- **State:** `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
+- **State:** `APPROVED` (2026-10-22: el usuario recorrió la app pública y confirmó las 7 pestañas y VeloVision en la nube). Antes: `REVIEW` (preparación aprobada 2026-10-21; despliegue real y prueba de humo pendientes del usuario)
 - **Sprint:** 4 · **Priority:** `P0` · **DependsOn:** `HACK-019` (la prueba de despliegue va antes; el despliegue final, después de HACK-017)
 - **AllowedPaths:** `requirements.txt`, `runtime.txt` o `.python-version`, `.streamlit/config.toml`, `packages.txt` (dependencias de sistema si OpenCV o MediaPipe las piden), `README.md` (sección "Cómo usar la app"), `docs/DEPLOY.md`.
 - **Especificación:**

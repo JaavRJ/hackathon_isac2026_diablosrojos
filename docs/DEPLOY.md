@@ -1,7 +1,7 @@
 # Despliegue publico de Diablos AeroVision (HACK-020)
 
 Plataforma: **Streamlit Community Cloud** (despliega desde `main` de GitHub). Respaldo: Hugging Face Spaces.
-Repo (privado): https://github.com/JaavRJ/hackathon_isac2026_diablosrojos
+Repo (público): https://github.com/JaavRJ/hackathon_isac2026_diablosrojos
 **App pública: https://diablos-aerovision.streamlit.app** (publicada; ver "Prueba de humo" abajo).
 
 ## Que viaja al despliegue
@@ -22,7 +22,7 @@ Decision: se sacaron de `requirements.txt` xgboost, catboost, econml, shap, kale
 Streamlit Community Cloud **no lee `runtime.txt` ni `.python-version`**: la version se elige en la UI (Advanced settings al desplegar, o Settings de la app). Elegir **Python 3.12** (el `.venv` local usa 3.12.1). mediapipe 1.1.1 es un wheel `py3-none-manylinux_2_28_x86_64`, valido para 3.12.
 
 ## Pasos (los hace el usuario)
-El repo es **privado** y la app es **pública**. Para que Streamlit Cloud lea un repo privado hay que autorizarlo; después se hace pública la app.
+El repo y la app son **públicos** (el repo se hizo público el 22-oct-2026 para la entrega). Mientras el repo fue privado, Streamlit Cloud necesitó autorización para leerlo; ese paso ya no hace falta.
 1. Haz commit y push a `main` de: `requirements.txt`, `requirements-dev.txt`, `packages.txt`, `docs/DEPLOY.md` (y `models/*.joblib`, ya versionados).
 2. Entra a https://share.streamlit.io con tu cuenta de GitHub. Para repos privados: **Settings → Linked accounts** y autoriza el acceso a repositorios privados de GitHub.
 3. **Create app** > "Deploy a public app from GitHub".
@@ -48,10 +48,10 @@ El repo es **privado** y la app es **pública**. Para que Streamlit Cloud lea un
 Estado a la fecha (22-oct-2026): **la app esta publicada** en https://diablos-aerovision.streamlit.app, con Python 3.12.
 - URL publica: https://diablos-aerovision.streamlit.app (registrada).
 - Tiempo de carga en frio: _sin medir en este repo_ (en local, la carga en frio de las pruebas es de unos 3 s; el criterio es < 60 s).
-- 7 pestanas sin error: _pendiente de registrar por el usuario/Revisor_.
-- VeloVision procesa un clip de 5 s en el servidor: _pendiente de registrar_. `cbc73bc` anadio `libegl1`/`libgles2` a `packages.txt` para MediaPipe en Linux; tras ese cambio hay que hacer Reboot y confirmar VeloVision en la nube.
+- 7 pestanas sin error: **OK** (recorrido del usuario en la app publica, 22-oct-2026).
+- VeloVision procesa un clip en el servidor: **OK** (prueba del usuario en la app publica, 22-oct-2026). `cbc73bc` anadio `libegl1`/`libgles2` a `packages.txt` para MediaPipe en Linux; tras ese cambio hay que hacer Reboot y confirmar VeloVision en la nube.
 - Limite conocido: el Modo anotacion escribe en un contenedor efimero y los clips de `data/vision_clips/` no existen en la nube; esa pestana se usa en local.
-- HACK-020 sigue en `REVIEW` en `docs/TASKS.md` hasta registrar la prueba de humo (el estado lo cambia el Revisor o el usuario).
+- HACK-020 queda en `APPROVED` en `docs/TASKS.md` con esta prueba de humo.
 
 ## Verificacion previa (2026-10-21, venv limpio con solo `requirements.txt`, Windows/Python 3.12.1)
 - Instalacion OK, incluido mediapipe 1.1.1 y opencv-python-headless 5.0.0.93.

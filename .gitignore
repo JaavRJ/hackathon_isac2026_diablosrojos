@@ -38,3 +38,7 @@ docs/latex/*.toc
 docs/latex/*.synctex.gz
 docs/latex/*.fls
 docs/latex/*.fdb_latexmk
+
+# Demo video build files (audio and intermediate segments)
+*.wav
+output/demo_video/_segmentos/

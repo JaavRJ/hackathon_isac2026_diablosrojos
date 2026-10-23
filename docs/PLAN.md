@@ -1,6 +1,6 @@
 # Plan de Implementación y Protocolo Multi-Agente — Diablos AeroVision
 
-> **Estado a la fecha (22-oct-2026):** el plan original tenía 18 tareas (HACK-001 a 018) en 8 olas. El tablero real tiene **21** (se agregaron HACK-019 rediseño visual, HACK-020 despliegue y HACK-021 homepage). Estados: HACK-001 a 016, 018, 019 y 021 `APPROVED`; HACK-017 (VeloVision) `IN_PROGRESS`; HACK-020 (despliegue) `REVIEW`. La fuente de verdad de los estados es [`TASKS.md`](TASKS.md).
+> **Estado a la fecha (22-oct-2026):** el plan original tenía 18 tareas (HACK-001 a 018) en 8 olas. El tablero real tiene **21** (se agregaron HACK-019 rediseño visual, HACK-020 despliegue y HACK-021 homepage). Estados: las 21 tareas `APPROVED` (HACK-017 y HACK-020 cerradas el 22-oct-2026). La fuente de verdad de los estados es [`TASKS.md`](TASKS.md).
 >
 > **Nota de proceso:** el flujo real fue Orquestador → Worker → Revisor como se describe abajo, pero con **reaperturas**: HACK-010 se reabrió dos veces (Stuff+ pasó a entrenarse como residuo sobre el conteo; luego se quitaron los proxies de ubicación y se regularizó con CV por pitcher), HACK-012 cambió de criterio (Pitching+ gana en todo; Stuff+ se juzga en `xrv_pitcher` con tolerancia de empate 1e-4 y en targets de stuff), HACK-013 pasó a una descomposición de 3 términos, y HACK-018 se rehízo en LaTeX con Stuff+ reencuadrado como descriptor físico. HACK-017 17-D es un piloto con n=4 **sin revisión independiente**, por decisión del usuario. Los textos de abajo conservan el plan original; donde difieren, manda `TASKS.md`.
 
@@ -100,10 +100,10 @@ flowchart TD
 | 1–5 (Sprint 1) | HACK-001 a 008 | `APPROVED` |
 | 6–9 (Sprint 2) | HACK-009 a 014 | `APPROVED` (HACK-010 reabierta dos veces; HACK-012 con criterio actualizado; HACK-013 de 3 términos) |
 | 10 | HACK-015 y 016 | `APPROVED` |
-| 10 | HACK-017 VeloVision | `IN_PROGRESS` (17-A/B/C y ajustes por video real aprobados; 17-D piloto n=4 sin revisión independiente) |
+| 10 | HACK-017 VeloVision | `APPROVED` (17-A/B/C y ajustes por video real aprobados; 17-D piloto n=4 sin revisión independiente) |
 | 11 | HACK-018 (LaTeX) | `APPROVED` (sección de VeloVision actualizada con el piloto) |
 | Extra | HACK-019 modo claro, HACK-021 homepage | `APPROVED` |
-| Extra | HACK-020 despliegue | `REVIEW` (app publicada en https://diablos-aerovision.streamlit.app; ver [`DEPLOY.md`](DEPLOY.md)) |
+| Extra | HACK-020 despliegue | `APPROVED` (app publicada en https://diablos-aerovision.streamlit.app; ver [`DEPLOY.md`](DEPLOY.md)) |
 
 ## 3. Resumen de Sprints
 
