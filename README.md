@@ -214,7 +214,6 @@ Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las libr
 | [docs/PLAN.md](docs/PLAN.md) | Plan, olas y flujo Orquestador → Worker → Revisor |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Despliegue público |
 | [docs/PLAN_REDISENO_UI.md](docs/PLAN_REDISENO_UI.md), [docs/DISENO_UI_NIELSEN.md](docs/DISENO_UI_NIELSEN.md) | Diseño visual y usabilidad |
-| [docs/COMPETENCIA.md](docs/COMPETENCIA.md) | Benchmark del rival y nuestra respuesta |
 | [docs/CONTINUAR_EN_OTRA_PC.md](docs/CONTINUAR_EN_OTRA_PC.md) | Setup en otra máquina |
 | [docs/latex/README.md](docs/latex/README.md) | Entregables escritos en LaTeX |
 

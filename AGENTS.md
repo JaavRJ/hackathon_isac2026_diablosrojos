@@ -3,7 +3,7 @@
 > **Proyecto:** Hackathon ISAC 2026 · Reto 2 Diablos Rojos — *Stuff Plus Model: calidad de pitcheo ajustada por entorno*.
 > **Producto:** **Diablos AeroVision** (Stuff+ LMB · Pitch Sculptor · VeloVision).
 > **Entrega:** 22-oct-2026, 23:59 CDMX (`itamsportsanalytics@gmail.com`). Sprint.
-> **Lee después:** [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (idea, física, métodos) · **[docs/TASKS.md](docs/TASKS.md)** (backlog especificado por tarea) · **[docs/CONTRACT.md](docs/CONTRACT.md)** (contrato de columnas y firmas) · [docs/PLAN.md](docs/PLAN.md) (protocolo Orquestador → Worker → Revisor). Benchmark del rival: [docs/COMPETENCIA.md](docs/COMPETENCIA.md) (solo si te lo piden).
+> **Lee después:** [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) (idea, física, métodos) · **[docs/TASKS.md](docs/TASKS.md)** (backlog especificado por tarea) · **[docs/CONTRACT.md](docs/CONTRACT.md)** (contrato de columnas y firmas) · [docs/PLAN.md](docs/PLAN.md) (protocolo Orquestador → Worker → Revisor).
 
 ---
 

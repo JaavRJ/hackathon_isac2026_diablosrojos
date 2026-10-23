@@ -68,7 +68,7 @@ Con el pitcheo por defecto, una Four-Seam que pierde *ride* en CDMX (IVB 16 → 
 
 Se conservan literales todos los textos de honestidad ya aprobados (HACK-015, HACK-016).
 
-### 3.1 Ajustes por la actualización de la competencia (`COMPETENCIA.md`, 20-oct-2026)
+### 3.1 Ajustes por la actualización de la competencia (20-oct-2026)
 8. **Franja de cifras ancla:** mejora de Pitching+ vs baseline nulo en cada holdout (RMSE `xrv_pitcher`) + estabilidad año a año, desde `reports/validation/`.
 9. **Badges de procedencia** en cada pantalla: modelo, CSV de origen, ρ̂ usado, dentro/fuera de muestra.
 10. **Desglose del resultado en lenguaje llano** (bola, strike cantado, whiff, contacto) junto al SHAP, desde las probabilidades `exp_*` de `predict_outcomes`.

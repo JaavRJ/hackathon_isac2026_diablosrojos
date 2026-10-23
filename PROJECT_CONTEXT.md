@@ -22,8 +22,6 @@ Para el **pitching coach y el director deportivo de Diablos Rojos**, **AeroVisio
 2. **Prescripción, no solo diagnóstico:** Pitch Sculptor busca la forma de pitcheo que maximiza el Stuff+ CDMX **dentro de lo que pitchers con el mismo slot y velocidad realmente lanzan**.
 3. **Entrada desde video** (VeloVision) para prospectos sin TrackMan, con el error medido y reportado.
 
-Detalle del rival: [docs/COMPETENCIA.md](docs/COMPETENCIA.md).
-
 ## 3. Física (versión correcta)
 - **Densidad.** Atmósfera estándar a 2,240 m: ρ/ρ₀ ≈ 0.78 (teórico). Las bases dicen "~20 % menor". La densidad efectiva por juego la **estimamos del arrastre** (ρ̂, §4.3). `[por verificar: valor medido en Extreme]`.
 - **Fuerzas aerodinámicas** (arrastre, Magnus y Seam-Shifted Wake) escalan ∝ ρ·v². **Todas** se debilitan en altitud. La **gravedad** no cambia.
