@@ -5,7 +5,24 @@ Hackathon ISAC 2026 · Reto 2 · Diablos Rojos del México.
 
 **App pública:** https://diablos-aerovision.streamlit.app
 
-![Python 3.12](https://img.shields.io/badge/python-3.12-blue) ![Streamlit 1.66](https://img.shields.io/badge/streamlit-1.66.0-red) ![Estado](https://img.shields.io/badge/entrega-22--oct--2026-lightgrey)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue) ![Streamlit 1.66](https://img.shields.io/badge/streamlit-1.66.0-red) ![Tests](https://img.shields.io/badge/tests-453%20passed-brightgreen) ![Estado](https://img.shields.io/badge/entrega-22--oct--2026-lightgrey)
+
+---
+
+## Para el jurado: dónde está cada entregable
+
+| Entregable (bases del reto) | Dónde |
+|---|---|
+| **1. Scores** Stuff+, Location+ y Pitching+ por `PitchUID` | `stuff_plus_scores_by_pitch.csv.gz` (634,624 filas), subido en el formulario de entrega. No está en el repo porque tiene granularidad de lanzamiento (`data/` va fuera de git); se regenera con `python -m analysis.export_scores`. Los agregados por pitcher y por repertorio sí están aquí: [`reports/leaderboards/`](reports/leaderboards/) |
+| **2. Perfil físico ideal en CDMX** (H1–H4) | Anexo A del [documento técnico](docs/latex/documento_tecnico.pdf) y [`reports/altitude/`](reports/altitude/) |
+| **3. Recomendaciones operativas** y 3 casos para la entrevista (fichaje, rediseño de pitcheo, casa vs gira) | Anexo A del [documento técnico](docs/latex/documento_tecnico.pdf) |
+| **4. Dashboard simulador** | https://diablos-aerovision.streamlit.app (código en [`dashboard/`](dashboard/)) |
+| **5. Documento técnico** (6–10 págs.) | [`docs/latex/documento_tecnico.pdf`](docs/latex/documento_tecnico.pdf): 9 págs. de cuerpo más el Anexo A |
+| **Video demo** (≤ 5 min) | Enlace de YouTube en el formulario de entrega |
+
+**Para revisar en 10 minutos:** (1) abre la app y entra a *Simulador* y *Leaderboard*; (2) lee en el documento técnico las secciones «Validación fuera de muestra» y «Aplicabilidad y fronteras del modelo»; (3) compara cualquier cifra con su CSV en [`reports/`](reports/), donde sale cada número de este README y del PDF.
+
+**Columnas del archivo de scores:** `PitchUID`, `pitcher_anon_id`, `year`, `pitch_id`, `stuff_plus_neutral`, `stuff_plus_cdmx`, `delta_stuff_cdmx`, `location_plus_neutral`, `location_plus_cdmx`, `pitching_plus_neutral`, `pitching_plus_cdmx` y las probabilidades esperadas `exp_target_*` (whiff, chase, strike cantado, rodado, contacto débil, contacto duro, out en el pitcheo) más `exp_xrv_pitcher`. Los modelos se entrenan con 2024–25; los scores de 2026 son fuera de muestra y los de 2024–25 son en muestra. Definiciones completas en el docstring de [`analysis/export_scores.py`](analysis/export_scores.py).
 
 ---
 
@@ -116,7 +133,8 @@ models/            *.joblib versionados + pose_landmarker_full.task (MediaPipe)
 tests/             pytest (fixture sintético, sin datos reales)
 docs/              contrato, plan, tablero de tareas, despliegue, diseño, benchmark
 docs/latex/        documento técnico y perfil/recomendaciones (LaTeX)
-data/              NO va a git: parquet y clips de video
+output/demo_video/ láminas, guiones y scripts para armar el video demo (audio y .mp4 fuera de git)
+data/              NO va a git: parquet, scores por PitchUID y clips de video
 ```
 
 ---
@@ -143,7 +161,7 @@ Para análisis y tests: `pip install -r requirements-dev.txt` (incluye `requirem
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-Los tests corren con un fixture sintético (1,200 filas con las 84 columnas del diccionario); no necesitan el parquet. Una corrida completa tarda unos minutos.
+Los tests corren con un fixture sintético (1,200 filas con las 84 columnas del diccionario); no necesitan el parquet. Corrida completa del 22-oct-2026: **453 passed** en unos 2.5 min. Entre ellos, `tests/test_final_deliverables.py` comprueba que cada cifra del documento técnico exista en `reports/`.
 
 ## 7. Regenerar los reportes
 
@@ -167,7 +185,7 @@ Las instrucciones están en [docs/latex/README.md](docs/latex/README.md): `pdfla
 
 ## 9. Despliegue
 
-Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las librerías de sistema que pide MediaPipe. Pasos, requisitos y estado de la prueba de humo en [docs/DEPLOY.md](docs/DEPLOY.md).
+Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las librerías de sistema que pide MediaPipe. Prueba de humo del 22-oct-2026 en la app pública: las 7 pestañas cargan y VeloVision procesa un clip en el servidor. El Modo anotación se usa solo en local (la nube tiene disco efímero). Pasos y requisitos en [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ---
 
@@ -190,7 +208,8 @@ Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las libr
 |---|---|
 | [AGENTS.md](AGENTS.md) | Reglas obligatorias y protocolo por rol |
 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) | Idea, física, métodos, entregables |
-| [docs/TASKS.md](docs/TASKS.md) | Tablero y especificación de HACK-001 a HACK-021, con revisiones |
+| [docs/TASKS.md](docs/TASKS.md) | Tablero y especificación de HACK-001 a HACK-021 (las 21 aprobadas), con revisiones |
+| [docs/DEMO_VIDEO.md](docs/DEMO_VIDEO.md) | Guion del video demo |
 | [docs/CONTRACT.md](docs/CONTRACT.md) | Contrato de columnas y firmas |
 | [docs/PLAN.md](docs/PLAN.md) | Plan, olas y flujo Orquestador → Worker → Revisor |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Despliegue público |
@@ -208,7 +227,7 @@ Proyecto del **Equipo Noba** (Reyna Juárez Javier; Ochoa Alva Nadia Paola) para
 ### IA generativa
 - **Código y documentación:** se escribieron con asistentes de IA (Claude Code de Anthropic, Codex de OpenAI y Gemini de Google), con el protocolo Orquestador → Worker → Revisor de [AGENTS.md](AGENTS.md) y [docs/PLAN.md](docs/PLAN.md). Cada tarea tiene su especificación, sus archivos permitidos, su test y una revisión independiente registrada en [docs/TASKS.md](docs/TASKS.md). Las decisiones de modelado, el alcance y la aprobación final son del equipo.
 - **Cifras:** la IA no generó datos ni resultados. Todas las cifras salen del pipeline sobre los datos TrackMan y se leen de `reports/`. `tests/test_final_deliverables.py` falla si el documento técnico cita un número que no existe en esos CSV.
-- **Video demo:** las seis láminas se generaron con una herramienta de generación de imágenes (instrucciones en `output/demo_video/prompts.json`) y son esquemáticas: no muestran trayectorias medidas, lanzadores identificados ni fotos del estadio. La intro animada también es generada con IA. Las voces son del equipo y las tomas de la app son grabaciones reales.
+- **Video demo:** las seis láminas se generaron con una herramienta de generación de imágenes (instrucciones en `output/demo_video/prompts.json`) y son esquemáticas: no muestran trayectorias medidas, lanzadores identificados ni fotos del estadio. La intro animada también es generada con IA. Las voces y la música de fondo son del equipo (la música la compuso un integrante), y las tomas de la app son grabaciones reales.
 
 ### Librerías y modelos de terceros
 | Componente | Uso | Licencia |
