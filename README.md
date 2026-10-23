@@ -3,7 +3,7 @@
 **Calidad de pitcheo ajustada por la altitud de la Ciudad de México.**
 Hackathon ISAC 2026 · Reto 2 · Diablos Rojos del México.
 
-**App pública:** https://diablos-aerovision.streamlit.app
+**App pública:** https://diablos-aerovision.streamlit.app · **Video demo:** https://youtu.be/lFUaiVm2P1I
 
 ![Python 3.12](https://img.shields.io/badge/python-3.12-blue) ![Streamlit 1.66](https://img.shields.io/badge/streamlit-1.66.0-red) ![Tests](https://img.shields.io/badge/tests-453%20passed-brightgreen) ![Estado](https://img.shields.io/badge/entrega-22--oct--2026-lightgrey)
 
@@ -18,7 +18,7 @@ Hackathon ISAC 2026 · Reto 2 · Diablos Rojos del México.
 | **3. Recomendaciones operativas** y 3 casos para la entrevista (fichaje, rediseño de pitcheo, casa vs gira) | Anexo A del [documento técnico](docs/latex/documento_tecnico.pdf) |
 | **4. Dashboard simulador** | https://diablos-aerovision.streamlit.app (código en [`dashboard/`](dashboard/)) |
 | **5. Documento técnico** (6–10 págs.) | [`docs/latex/documento_tecnico.pdf`](docs/latex/documento_tecnico.pdf): 9 págs. de cuerpo más el Anexo A |
-| **Video demo** (≤ 5 min) | Enlace de YouTube en el formulario de entrega |
+| **Video demo** (≤ 5 min) | https://youtu.be/lFUaiVm2P1I |
 
 **Para revisar en 10 minutos:** (1) abre la app y entra a *Simulador* y *Leaderboard*; (2) lee en el documento técnico las secciones «Validación fuera de muestra» y «Aplicabilidad y fronteras del modelo»; (3) compara cualquier cifra con su CSV en [`reports/`](reports/), donde sale cada número de este README y del PDF.
 
