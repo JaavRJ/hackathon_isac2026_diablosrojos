@@ -202,3 +202,21 @@ Streamlit Community Cloud desde `main`, Python 3.12, `packages.txt` con las libr
 ## 12. Créditos
 
 Proyecto del **Equipo Noba** (Reyna Juárez Javier; Ochoa Alva Nadia Paola) para el **Hackathon ISAC 2026**, **Reto 2 · Diablos Rojos del México** (*Stuff Plus Model: calidad de pitcheo ajustada por entorno*). Datos TrackMan de la LMB proporcionados por los organizadores; no se redistribuyen. VeloVision usa MediaPipe Pose Landmarker.
+
+## 13. Uso de IA generativa y herramientas de terceros
+
+### IA generativa
+- **Código y documentación:** se escribieron con asistentes de IA (Claude Code de Anthropic, Codex de OpenAI y Gemini de Google), con el protocolo Orquestador → Worker → Revisor de [AGENTS.md](AGENTS.md) y [docs/PLAN.md](docs/PLAN.md). Cada tarea tiene su especificación, sus archivos permitidos, su test y una revisión independiente registrada en [docs/TASKS.md](docs/TASKS.md). Las decisiones de modelado, el alcance y la aprobación final son del equipo.
+- **Cifras:** la IA no generó datos ni resultados. Todas las cifras salen del pipeline sobre los datos TrackMan y se leen de `reports/`. `tests/test_final_deliverables.py` falla si el documento técnico cita un número que no existe en esos CSV.
+- **Video demo:** las seis láminas se generaron con una herramienta de generación de imágenes (instrucciones en `output/demo_video/prompts.json`) y son esquemáticas: no muestran trayectorias medidas, lanzadores identificados ni fotos del estadio. La intro animada también es generada con IA. Las voces son del equipo y las tomas de la app son grabaciones reales.
+
+### Librerías y modelos de terceros
+| Componente | Uso | Licencia |
+|---|---|---|
+| [pandas](https://pandas.pydata.org), [NumPy](https://numpy.org), [PyArrow](https://arrow.apache.org) | Datos y parquet | BSD-3 / BSD-3 / Apache-2.0 |
+| [scikit-learn](https://scikit-learn.org), [LightGBM](https://lightgbm.readthedocs.io), [SciPy](https://scipy.org), [joblib](https://joblib.readthedocs.io) | Modelos, calibración y estadística | BSD-3 / MIT / BSD-3 / BSD-3 |
+| [Streamlit](https://streamlit.io), [streamlit-image-coordinates](https://github.com/blackary/streamlit-image-coordinates), [Plotly](https://plotly.com/python/) | Dashboard | Apache-2.0 / MIT / MIT |
+| [MediaPipe](https://ai.google.dev/edge/mediapipe) y su modelo Pose Landmarker (`models/pose_landmarker_full.task`), [OpenCV](https://opencv.org) | VeloVision | Apache-2.0 / Apache-2.0 |
+| [pytest](https://pytest.org), [Matplotlib](https://matplotlib.org), pdfLaTeX | Tests, figuras y documento técnico | MIT / PSF / LPPL |
+
+Las versiones exactas están en `requirements.txt` y `requirements-dev.txt`. La app se publica en Streamlit Community Cloud.
